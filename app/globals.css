@@ -1,0 +1,222 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+
+  /* ── Traditional Indian festive palette helpers ── */
+  --color-green: var(--green);
+  --color-green-deep: var(--green-deep);
+  --color-green-dark: var(--green-dark);
+  --color-maroon: var(--maroon);
+  --color-maroon-deep: var(--maroon-deep);
+  --color-saffron: var(--saffron);
+  --color-gold: var(--gold);
+  --color-gold-bright: var(--gold-bright);
+  --color-cream: var(--cream);
+  --color-ivory: var(--ivory);
+  --color-brown: var(--brown);
+
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display-serif);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* ────────────────────────────────────────────────────────────
+   Silver Jubilee Alumni · Traditional Indian festive theme
+   Deep green + maroon + gold + cream / ivory
+   ──────────────────────────────────────────────────────────── */
+:root,
+.light {
+  color-scheme: light;
+
+  --background: #fff8e7; /* cream */
+  --foreground: #3a2418; /* text dark brown */
+  --card: #fffdf5; /* warm ivory */
+  --card-foreground: #3a2418;
+  --popover: #fffdf5;
+  --popover-foreground: #3a2418;
+
+  --primary: #0b5d3b; /* deep green */
+  --primary-foreground: #fff8e7; /* cream */
+
+  --secondary: #9e1b23; /* maroon */
+  --secondary-foreground: #fff8e7;
+
+  --muted: #f4e8cd; /* soft cream */
+  --muted-foreground: #7a5c3e; /* muted warm brown */
+
+  --accent: #d4a017; /* gold */
+  --accent-foreground: #4a2c1a; /* dark brown */
+
+  --destructive: #9e1b23; /* maroon / red errors */
+
+  --border: #e3ce93; /* soft gold */
+  --input: #e3ce93;
+  --ring: #0b5d3b; /* deep green focus */
+
+  --radius: 0.9rem;
+
+  /* extended festive palette */
+  --green: #0b5d3b;
+  --green-deep: #0b5d3b;
+  --green-dark: #06452d;
+  --maroon: #9e1b23;
+  --maroon-deep: #7a151b;
+  --saffron: #d97706;
+  --gold: #d4a017;
+  --gold-bright: #f2c14e;
+  --cream: #fff8e7;
+  --ivory: #fffdf5;
+  --brown: #4a2c1a;
+
+  --sidebar: #fffdf5;
+  --sidebar-foreground: #3a2418;
+  --sidebar-primary: #0b5d3b;
+  --sidebar-primary-foreground: #fff8e7;
+  --sidebar-accent: #f4e8cd;
+  --sidebar-accent-foreground: #4a2c1a;
+  --sidebar-border: #e3ce93;
+  --sidebar-ring: #0b5d3b;
+}
+
+/* ── Decorative festive backdrop ── */
+.festive-bg {
+  background-color: #06452d;
+  background-image:
+    radial-gradient(120% 90% at 50% 0%, rgba(212, 160, 23, 0.22), transparent 55%),
+    radial-gradient(90% 70% at 50% 100%, rgba(158, 27, 35, 0.28), transparent 60%),
+    linear-gradient(160deg, #0b5d3b 0%, #06452d 55%, #073d28 100%);
+}
+
+/* subtle repeating diamond motif for panels */
+.festive-motif {
+  background-image: radial-gradient(circle at 1px 1px, rgba(212, 160, 23, 0.14) 1px, transparent 0);
+  background-size: 16px 16px;
+}
+
+/* elegant gold framed content panel */
+.festive-panel {
+  position: relative;
+  background: linear-gradient(180deg, #fffdf5 0%, #fff8e7 100%);
+  border: 1.5px solid var(--gold);
+  box-shadow:
+    0 0 0 6px #0b5d3b,
+    0 0 0 7.5px var(--gold),
+    0 30px 60px -20px rgba(6, 69, 45, 0.55);
+}
+
+/* thin ornamental corner accents on framed panels */
+.festive-panel::before,
+.festive-panel::after {
+  content: '';
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-color: var(--maroon);
+  border-style: solid;
+  pointer-events: none;
+}
+.festive-panel::before {
+  top: 10px;
+  left: 10px;
+  border-width: 2px 0 0 2px;
+  border-top-left-radius: 6px;
+}
+.festive-panel::after {
+  bottom: 10px;
+  right: 10px;
+  border-width: 0 2px 2px 0;
+  border-bottom-right-radius: 6px;
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px rgba(242, 193, 78, 0.9));
+  }
+  50% {
+    opacity: 0.55;
+    filter: drop-shadow(0 0 1px rgba(242, 193, 78, 0.4));
+  }
+}
+
+.animate-step-in {
+  animation: step-in 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-twinkle {
+  animation: twinkle 2.4s ease-in-out infinite;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  }
+}
