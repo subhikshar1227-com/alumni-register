@@ -201,10 +201,10 @@ export function AlumniRegistration() {
                 {COLLEGE_SHORT} Silver Jubilee
               </span>
             </div>
-            <div className="mb-3 flex items-center justify-center gap-4" aria-hidden="true">
-              <DiyaDecor className="h-7 w-9" />
-              <DiyaDecor className="h-7 w-9" />
-              <DiyaDecor className="h-7 w-9" />
+            <div className="mb-3 flex items-center justify-center gap-3" aria-hidden="true">
+              {Array.from({ length: 5 }, (_, index) => (
+                <DiyaDecor key={index} className="h-7 w-9" />
+              ))}
             </div>
             <ProgressIndicator sections={[...SECTIONS]} currentSection={STEP_SECTION[currentStep]} />
           </header>
