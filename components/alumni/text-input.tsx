@@ -9,10 +9,10 @@ type TextInputProps = {
   value: string
   onChange: (value: string) => void
   placeholder?: string
-  type?: "text" | "email" | "tel" | "number"
+  type?: "text" | "email" | "tel" | "number" | "url"
   optional?: boolean
   error?: string
-  inputMode?: "text" | "email" | "tel" | "numeric"
+  inputMode?: "text" | "email" | "tel" | "numeric" | "url"
   prefix?: ReactNode
   multiline?: boolean
   maxLength?: number

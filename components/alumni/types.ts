@@ -11,6 +11,8 @@ export type FormData = {
   food: "veg" | "non-veg" | ""
   phone: string
   email: string
+  photo: File | null
+  linkedinUrl: string
   company: string
   position: string
   awards: string
@@ -28,6 +30,8 @@ export const INITIAL_FORM_DATA: FormData = {
   food: "",
   phone: "",
   email: "",
+  photo: null,
+  linkedinUrl: "",
   company: "",
   position: "",
   awards: "",

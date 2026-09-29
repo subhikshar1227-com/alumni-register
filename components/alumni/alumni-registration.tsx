@@ -9,6 +9,7 @@ import {
   FOOD_PREFERENCES,
   PEOPLE_OPTIONS,
 } from "@/lib/config"
+import { Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { BenefitsCard } from "./benefits-card"
 import { ChoiceCard } from "./choice-card"
@@ -59,6 +60,19 @@ function isValidEmail(email: string) {
 function isValidIndianPhone(phone: string) {
   const digits = phone.replace(/\D/g, "")
   return /^[6-9]\d{9}$/.test(digits)
+}
+
+function isValidLinkedInUrl(value: string) {
+  try {
+    const url = new URL(value.trim())
+    return (
+      url.protocol === "https:" &&
+      (url.hostname === "linkedin.com" || url.hostname === "www.linkedin.com") &&
+      url.pathname.length > 1
+    )
+  } catch {
+    return false
+  }
 }
 
 export function AlumniRegistration() {
@@ -114,6 +128,10 @@ export function AlumniRegistration() {
         else if (!isValidEmail(data.email)) e.email = "Please enter a valid email address."
         break
       case "career":
+        if (!data.photo) e.photo = "Please upload a profile photo."
+        if (!data.linkedinUrl.trim()) e.linkedinUrl = "Please enter your LinkedIn profile URL."
+        else if (!isValidLinkedInUrl(data.linkedinUrl))
+          e.linkedinUrl = "Enter a valid https://www.linkedin.com profile URL."
         if (!data.company.trim()) e.company = "Please let us know where you currently work."
         break
       default:
@@ -389,8 +407,68 @@ export function AlumniRegistration() {
             {currentStep === "career" && (
               <FormStep
                 title="Tell us about your journey"
-                subtitle="The rest is optional — share as much or as little as you like."
+                subtitle="Add a profile photo and LinkedIn URL. The other details help us introduce you to the alumni community."
               >
+                <div className="w-full">
+                  <label htmlFor="photo" className="mb-2 flex items-center gap-2 text-sm font-semibold text-green-deep">
+                    Profile photo
+                    <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[0.7rem] font-medium text-maroon">
+                      Required
+                    </span>
+                  </label>
+                  <label
+                    htmlFor="photo"
+                    className={cn(
+                      "relative flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border-2 border-dashed bg-ivory px-4 py-3 text-sm text-brown transition-colors hover:border-green-deep focus-within:ring-4 focus-within:ring-gold/25",
+                      errors.photo ? "border-destructive" : "border-gold/60",
+                    )}
+                  >
+                    <Upload className="size-5 shrink-0 text-green-deep" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {data.photo ? data.photo.name : "Choose a clear photo (JPG, PNG or WEBP, up to 5 MB)"}
+                    </span>
+                    <input
+                      id="photo"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                      aria-required="true"
+                      aria-invalid={!!errors.photo}
+                      aria-describedby={errors.photo ? "photo-error" : undefined}
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0] ?? null
+                        if (file && (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024)) {
+                          update("photo", null)
+                          setErrors((prev) => ({
+                            ...prev,
+                            photo: file.size > 5 * 1024 * 1024
+                              ? "Photo must be 5 MB or smaller."
+                              : "Choose an image file in JPG, PNG or WEBP format.",
+                          }))
+                          event.currentTarget.value = ""
+                          return
+                        }
+                        update("photo", file)
+                      }}
+                    />
+                  </label>
+                  {errors.photo && (
+                    <p id="photo-error" className="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive" role="alert">
+                      {errors.photo}
+                    </p>
+                  )}
+                </div>
+                <TextInput
+                  id="linkedinUrl"
+                  label="LinkedIn profile URL"
+                  value={data.linkedinUrl}
+                  onChange={(v) => update("linkedinUrl", v)}
+                  placeholder="https://www.linkedin.com/in/your-name"
+                  type="url"
+                  inputMode="url"
+                  error={errors.linkedinUrl}
+                  autoFocus
+                />
                 <TextInput
                   id="company"
                   label="Where are you currently working?"

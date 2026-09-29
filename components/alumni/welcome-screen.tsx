@@ -1,7 +1,7 @@
 "use client"
 
 import { ArrowRight } from "lucide-react"
-import { HangingLights, LogoEmblem, OrnamentalDivider } from "./festive-decor"
+import { DiyaDecor, HangingLights, LogoEmblem, OrnamentalDivider } from "./festive-decor"
 
 type WelcomeScreenProps = {
   onStart: () => void
@@ -36,6 +36,11 @@ export function WelcomeScreen({ onStart }: WelcomeScreenProps) {
             who&apos;s coming. This form takes your batch details and, if you&apos;re joining us,
             a few notes for the day.
           </p>
+
+          <div className="my-5 flex items-center justify-center gap-8" aria-hidden="true">
+            <DiyaDecor className="-scale-x-100" />
+            <DiyaDecor />
+          </div>
 
           <OrnamentalDivider className="my-6" />
 
