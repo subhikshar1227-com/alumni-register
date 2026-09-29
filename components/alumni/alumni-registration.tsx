@@ -15,7 +15,7 @@ import { BenefitsCard } from "./benefits-card"
 import { ChoiceCard } from "./choice-card"
 import { FinalInfoCard } from "./final-info-card"
 import { FormStep } from "./form-step"
-import { HangingLights, LogoEmblem } from "./festive-decor"
+import { DiyaDecor, HangingLights, LogoEmblem } from "./festive-decor"
 import { NavigationButtons } from "./navigation-buttons"
 import { ProgressIndicator } from "./progress-indicator"
 import { SelectInput } from "./select-input"
@@ -200,6 +200,11 @@ export function AlumniRegistration() {
               <span className="font-display text-xl font-bold tracking-wide text-green-deep">
                 {COLLEGE_SHORT} Silver Jubilee
               </span>
+            </div>
+            <div className="mb-3 flex items-center justify-center gap-4" aria-hidden="true">
+              <DiyaDecor className="h-7 w-9" />
+              <DiyaDecor className="h-7 w-9" />
+              <DiyaDecor className="h-7 w-9" />
             </div>
             <ProgressIndicator sections={[...SECTIONS]} currentSection={STEP_SECTION[currentStep]} />
           </header>
