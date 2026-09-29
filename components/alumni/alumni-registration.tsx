@@ -14,7 +14,7 @@ import { BenefitsCard } from "./benefits-card"
 import { ChoiceCard } from "./choice-card"
 import { FinalInfoCard } from "./final-info-card"
 import { FormStep } from "./form-step"
-import { HangingLights, MandalaEmblem } from "./festive-decor"
+import { HangingLights, LogoEmblem } from "./festive-decor"
 import { NavigationButtons } from "./navigation-buttons"
 import { ProgressIndicator } from "./progress-indicator"
 import { SelectInput } from "./select-input"
@@ -26,6 +26,7 @@ import { INITIAL_FORM_DATA, type Errors, type FormData } from "./types"
 type Phase = "welcome" | "form" | "success"
 
 type StepId =
+  | "benefits"
   | "name"
   | "year"
   | "branch"
@@ -39,6 +40,7 @@ type StepId =
 const SECTIONS = ["About You", "Event", "Contact", "Career", "Complete"] as const
 
 const STEP_SECTION: Record<StepId, (typeof SECTIONS)[number]> = {
+  benefits: "About You",
   name: "About You",
   year: "About You",
   branch: "About You",
@@ -63,11 +65,12 @@ export function AlumniRegistration() {
   const [phase, setPhase] = useState<Phase>("welcome")
   const [data, setData] = useState<FormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<Errors>({})
-  const [currentStep, setCurrentStep] = useState<StepId>("name")
+  const [currentStep, setCurrentStep] = useState<StepId>("benefits")
+  const [submitting, setSubmitting] = useState(false)
 
   // Active steps depend on the attendance answer.
   const steps = useMemo<StepId[]>(() => {
-    const base: StepId[] = ["name", "year", "branch", "usn", "attendance"]
+    const base: StepId[] = ["benefits", "name", "year", "branch", "usn", "attendance"]
     if (data.attending === "yes") base.push("event")
     base.push("contact", "career", "review")
     return base
@@ -110,6 +113,9 @@ export function AlumniRegistration() {
         if (!data.email.trim()) e.email = "Please enter your email address."
         else if (!isValidEmail(data.email)) e.email = "Please enter a valid email address."
         break
+      case "career":
+        if (!data.company.trim()) e.company = "Please let us know where you currently work."
+        break
       default:
         break
     }
@@ -140,23 +146,24 @@ export function AlumniRegistration() {
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
-  const handleSubmit = () => {
-    // Frontend prototype only — no network request.
-    // Structured payload is ready for a future API:
-    // console.log("[v0] registration payload", data)
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    // No backend yet — simulate a brief submit before showing the success screen.
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    setSubmitting(false)
     setPhase("success")
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   const handleStart = () => {
     setPhase("form")
-    setCurrentStep("name")
+    setCurrentStep("benefits")
   }
 
   const handleRestart = () => {
     setData(INITIAL_FORM_DATA)
     setErrors({})
-    setCurrentStep("name")
+    setCurrentStep("benefits")
     setPhase("welcome")
   }
 
@@ -166,13 +173,13 @@ export function AlumniRegistration() {
   return (
     <div className="festive-bg min-h-dvh px-4 py-6 sm:py-9">
       <div className="animate-fade-up mx-auto w-full max-w-lg">
-        <div className="festive-panel overflow-hidden rounded-[1.75rem]">
+        <div className="festive-panel overflow-hidden rounded-2xl">
           {/* Festive header with progress */}
           <header className="border-b border-gold/50 bg-cream/70 px-5 pb-4 pt-4">
             <HangingLights className="mb-4" count={13} />
             <div className="mb-4 flex items-center justify-center gap-2.5">
-              <MandalaEmblem size={40} />
-              <span className="font-display text-base font-bold tracking-wide text-green-deep">
+              <LogoEmblem size={40} />
+              <span className="font-display text-xl font-bold tracking-wide text-green-deep">
                 {COLLEGE_SHORT} Silver Jubilee
               </span>
             </div>
@@ -180,6 +187,12 @@ export function AlumniRegistration() {
           </header>
 
           <main className="festive-motif px-5 pb-8 pt-6 sm:px-7">
+            {currentStep === "benefits" && (
+              <div className="animate-step-in">
+                <BenefitsCard />
+              </div>
+            )}
+
             {currentStep === "name" && (
               <FormStep title="What's your name?" subtitle="Let's start with the basics.">
                 <TextInput
@@ -196,7 +209,7 @@ export function AlumniRegistration() {
             )}
 
             {currentStep === "year" && (
-              <FormStep title={`When did you study at ${COLLEGE_SHORT}?`} subtitle="Pick your passing-out batch.">
+              <FormStep title={`When did you start your journey at ${COLLEGE_SHORT}?`} subtitle="Pick your joining-in batch.">
                 <SelectInput
                   id="year"
                   label="Batch / Year"
@@ -376,7 +389,7 @@ export function AlumniRegistration() {
             {currentStep === "career" && (
               <FormStep
                 title="Tell us about your journey"
-                subtitle="All optional — share as much or as little as you like."
+                subtitle="The rest is optional — share as much or as little as you like."
               >
                 <TextInput
                   id="company"
@@ -384,7 +397,7 @@ export function AlumniRegistration() {
                   value={data.company}
                   onChange={(v) => update("company", v)}
                   placeholder="Company / Organisation"
-                  optional
+                  error={errors.company}
                   autoFocus
                 />
                 <TextInput
@@ -420,7 +433,6 @@ export function AlumniRegistration() {
                 title="Almost done!"
                 subtitle="Here's what your alumni membership brings you."
               >
-                <BenefitsCard />
                 <FinalInfoCard />
               </FormStep>
             )}
@@ -428,8 +440,9 @@ export function AlumniRegistration() {
             <NavigationButtons
               onBack={goBack}
               onNext={currentStep === "review" ? handleSubmit : goNext}
-              nextLabel={currentStep === "review" ? "Complete Registration" : "Continue"}
+              nextLabel={currentStep === "review" ? (submitting ? "Submitting…" : "Complete Registration") : "Continue"}
               isLast={currentStep === "review"}
+              disabled={submitting}
             />
           </main>
         </div>

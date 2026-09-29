@@ -1,8 +1,8 @@
 "use client"
 
 import type { FormData } from "./types"
-import { Check, Mail, PartyPopper, ShieldCheck } from "lucide-react"
-import { HangingLights, MandalaEmblem, OrnamentalDivider } from "./festive-decor"
+import { Check, Mail, ShieldCheck } from "lucide-react"
+import { HangingLights, OrnamentalDivider } from "./festive-decor"
 
 type SuccessScreenProps = {
   data: FormData
@@ -13,57 +13,48 @@ export function SuccessScreen({ data, onRestart }: SuccessScreenProps) {
   return (
     <div className="festive-bg flex min-h-dvh flex-col items-center justify-center px-4 py-8">
       <div className="animate-fade-up w-full max-w-md">
-        <div className="festive-panel festive-motif overflow-hidden rounded-[1.75rem] px-6 pb-8 pt-5 text-center sm:px-8">
+        <div className="festive-panel festive-motif overflow-hidden rounded-2xl px-6 pb-8 pt-5 text-center sm:px-8">
           <HangingLights className="mb-7" />
 
           {/* Success emblem */}
-          <div className="relative mx-auto mb-5 flex size-24 items-center justify-center">
-            <span
-              className="absolute inset-0 animate-ping rounded-full bg-gold/25"
-              style={{ animationDuration: "2s" }}
-            />
-            <span className="relative flex size-24 items-center justify-center rounded-full border-2 border-gold bg-green-deep shadow-xl shadow-green-dark/40 ring-4 ring-maroon/25">
-              <Check className="size-12 text-cream" strokeWidth={3} />
-            </span>
+          <div className="mx-auto mb-5 flex size-20 items-center justify-center rounded-full border-2 border-gold bg-green-deep shadow-md">
+            <Check className="size-10 text-cream" strokeWidth={3} />
           </div>
 
-          <h1 className="flex items-center justify-center gap-2 font-display text-3xl font-bold text-green-deep">
-            You&apos;re all set! <PartyPopper className="size-7 text-gold" />
+          <h1 className="font-display text-2xl font-bold text-green-deep sm:text-3xl">
+            Registered, {data.name?.split(" ")[0] || "friend"}
           </h1>
           <p className="mt-3 text-pretty text-base leading-relaxed text-brown/85">
-            Thank you for registering, {data.name?.split(" ")[0] || "friend"}. Your details have
-            been received successfully.
+            Thanks for filling this in — we&apos;ve got your details on record for the Silver
+            Jubilee.
           </p>
 
           <OrnamentalDivider className="my-6" />
 
-          <div className="space-y-3 text-left">
-            <div className="flex items-start gap-3 rounded-2xl border-2 border-gold/50 bg-cream/70 p-4 shadow-sm">
-              <ShieldCheck className="mt-0.5 size-5 shrink-0 text-green-deep" />
-              <p className="text-sm leading-relaxed text-brown/85">
-                Your registration will be processed after{" "}
-                <span className="font-semibold text-maroon">verification</span>.
-              </p>
-            </div>
-            <div className="flex items-start gap-3 rounded-2xl border-2 border-gold/50 bg-cream/70 p-4 shadow-sm">
-              <Mail className="mt-0.5 size-5 shrink-0 text-green-deep" />
-              <p className="text-sm leading-relaxed text-brown/85">
-                Your Alumni Membership Card and Event Entry Pass will be sent to{" "}
+          <div className="space-y-3 border-l-2 border-gold pl-4 text-left">
+            <p className="flex gap-2.5 text-sm leading-relaxed text-brown/85">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-green-deep" />
+              <span>
+                Processed after <span className="font-semibold text-maroon">verification</span>{" "}
+                by the organising batch.
+              </span>
+            </p>
+            <p className="flex gap-2.5 text-sm leading-relaxed text-brown/85">
+              <Mail className="mt-0.5 size-4 shrink-0 text-green-deep" />
+              <span>
+                Membership card and entry pass go to{" "}
                 <span className="font-semibold text-maroon">
                   {data.email || "your registered email"}
                 </span>
                 .
-              </p>
-            </div>
+              </span>
+            </p>
           </div>
 
           {data.attending === "yes" && (
-          <div
-            className="mt-4 rounded-2xl border p-4 text-center text-sm font-semibold shadow-[0_2px_18px_-6px_rgba(212,160,23,0.55)]"
-            style={{ backgroundColor: "#FFF3D6", borderColor: "#D4A017", color: "#7A4A18" }}
-          >
-            We can&apos;t wait to celebrate with you at the Silver Jubilee! 🎉
-          </div>
+            <div className="mt-4 rounded-lg border border-gold bg-gold/10 p-3 text-center text-sm font-semibold text-maroon">
+              See you at the Silver Jubilee.
+            </div>
           )}
 
           <button

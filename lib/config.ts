@@ -24,6 +24,9 @@ export const BRANCHES: string[] = [
   "Chemical Engineering",
   "Master of Business Administration (MBA)",
   "Master of Computer Applications (MCA)",
+  "M. Tech in Computer Science and Engineering",
+  "M. Tech in Electronics and Communication Engineering",
+  "M. Tech in Structural Engineering",
 ]
 
 export const FOOD_PREFERENCES = [

@@ -29,23 +29,17 @@ export function ChoiceCard({
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        "group relative flex w-full items-center gap-4 rounded-2xl border-2 p-4 text-left shadow-sm transition-all duration-200",
-        "hover:shadow-md active:translate-y-px",
+        "group relative flex w-full items-center gap-3.5 rounded-xl border-2 p-4 text-left transition-colors duration-150",
+        "active:translate-y-px",
         "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/40",
         selected
-          ? "border-gold bg-green-deep text-cream shadow-md shadow-green-dark/25"
-          : "border-gold/50 bg-ivory hover:border-gold hover:bg-gold/[0.07]",
+          ? "border-gold bg-green-deep text-cream"
+          : "border-gold/50 bg-ivory hover:border-gold",
         className,
       )}
     >
       {(emoji || icon) && (
-        <span
-          className={cn(
-            "flex size-12 shrink-0 items-center justify-center rounded-xl text-2xl transition-colors",
-            selected ? "bg-cream/15 ring-1 ring-gold/40" : "bg-gold/15",
-          )}
-          aria-hidden="true"
-        >
+        <span className="shrink-0 text-xl" aria-hidden="true">
           {icon ?? emoji}
         </span>
       )}

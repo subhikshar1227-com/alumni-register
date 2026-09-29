@@ -12,7 +12,7 @@ type FormStepProps = {
 export function FormStep({ title, subtitle, children }: FormStepProps) {
   return (
     <div className="animate-step-in">
-      <h2 className="text-balance font-display text-2xl font-bold leading-tight text-green-deep sm:text-[1.7rem]">
+      <h2 className="text-balance font-display text-2xl font-bold leading-tight text-green-deep sm:text-3xl">
         {title}
       </h2>
       {subtitle && (

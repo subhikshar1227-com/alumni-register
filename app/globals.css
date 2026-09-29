@@ -115,54 +115,50 @@
   --sidebar-ring: #0b5d3b;
 }
 
-/* ── Decorative festive backdrop ── */
+/* ── Decorative festive backdrop ──
+   Solid ground colour + a faint printed textile motif, not a gradient wash. */
 .festive-bg {
   background-color: #06452d;
-  background-image:
-    radial-gradient(120% 90% at 50% 0%, rgba(212, 160, 23, 0.22), transparent 55%),
-    radial-gradient(90% 70% at 50% 100%, rgba(158, 27, 35, 0.28), transparent 60%),
-    linear-gradient(160deg, #0b5d3b 0%, #06452d 55%, #073d28 100%);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23D4A017' stroke-width='0.75' opacity='0.16'%3E%3Cpath d='M36 8c9 6 9 16 0 22-9-6-9-16 0-22z'/%3E%3Ccircle cx='36' cy='36' r='2'/%3E%3Cpath d='M8 36h10M54 36h10M36 54v10M36 8V-2'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 72px 72px;
 }
 
-/* subtle repeating diamond motif for panels */
+/* faint card-stock texture for framed panels — a grid of pinpricks, not a glow */
 .festive-motif {
-  background-image: radial-gradient(circle at 1px 1px, rgba(212, 160, 23, 0.14) 1px, transparent 0);
-  background-size: 16px 16px;
+  background-image: radial-gradient(circle at 1px 1px, rgba(122, 74, 24, 0.1) 1px, transparent 0);
+  background-size: 14px 14px;
 }
 
-/* elegant gold framed content panel */
+/* framed content panel styled like printed invitation card-stock:
+   a single hairline rule set inside a slightly heavier outer rule. */
 .festive-panel {
   position: relative;
-  background: linear-gradient(180deg, #fffdf5 0%, #fff8e7 100%);
-  border: 1.5px solid var(--gold);
+  background: #fffdf5;
+  border: 3px solid var(--green-deep);
+  border-radius: inherit;
   box-shadow:
-    0 0 0 6px #0b5d3b,
-    0 0 0 7.5px var(--gold),
-    0 30px 60px -20px rgba(6, 69, 45, 0.55);
+    inset 0 0 0 4px #fff8e7,
+    inset 0 0 0 5px var(--gold),
+    0 18px 34px -18px rgba(6, 69, 45, 0.45);
 }
 
-/* thin ornamental corner accents on framed panels */
+/* small printed corner flourish, not a glowing border-radius trick */
 .festive-panel::before,
 .festive-panel::after {
-  content: '';
+  content: '◆';
   position: absolute;
-  width: 26px;
-  height: 26px;
-  border-color: var(--maroon);
-  border-style: solid;
+  font-size: 0.6rem;
+  line-height: 1;
+  color: var(--maroon);
   pointer-events: none;
 }
 .festive-panel::before {
-  top: 10px;
-  left: 10px;
-  border-width: 2px 0 0 2px;
-  border-top-left-radius: 6px;
+  top: 9px;
+  left: 9px;
 }
 .festive-panel::after {
-  bottom: 10px;
-  right: 10px;
-  border-width: 0 2px 2px 0;
-  border-bottom-right-radius: 6px;
+  bottom: 9px;
+  right: 9px;
 }
 
 @keyframes step-in {
@@ -190,12 +186,10 @@
 @keyframes twinkle {
   0%,
   100% {
-    opacity: 1;
-    filter: drop-shadow(0 0 4px rgba(242, 193, 78, 0.9));
+    opacity: 0.9;
   }
   50% {
-    opacity: 0.55;
-    filter: drop-shadow(0 0 1px rgba(242, 193, 78, 0.4));
+    opacity: 0.5;
   }
 }
 

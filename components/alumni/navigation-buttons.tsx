@@ -9,6 +9,7 @@ type NavigationButtonsProps = {
   nextLabel?: string
   showBack?: boolean
   isLast?: boolean
+  disabled?: boolean
 }
 
 export function NavigationButtons({
@@ -17,6 +18,7 @@ export function NavigationButtons({
   nextLabel = "Continue",
   showBack = true,
   isLast = false,
+  disabled = false,
 }: NavigationButtonsProps) {
   return (
     <div className="mt-8 flex items-center gap-3">
@@ -25,7 +27,7 @@ export function NavigationButtons({
           type="button"
           onClick={onBack}
           className={cn(
-            "flex h-13 items-center justify-center gap-2 rounded-2xl border-2 border-maroon/60 bg-ivory px-5 text-base font-semibold text-maroon shadow-sm transition-all",
+            "flex h-13 items-center justify-center gap-2 rounded-xl border-2 border-maroon/60 bg-ivory px-5 text-base font-semibold text-maroon transition-colors",
             "hover:bg-maroon hover:text-cream active:translate-y-px focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-maroon/25",
           )}
         >
@@ -36,9 +38,11 @@ export function NavigationButtons({
       <button
         type="button"
         onClick={onNext}
+        disabled={disabled}
         className={cn(
-          "flex h-13 flex-1 items-center justify-center gap-2 rounded-2xl bg-green-deep px-6 text-base font-semibold text-cream shadow-lg shadow-green-dark/25 ring-1 ring-inset ring-gold/40 transition-all",
+          "flex h-13 flex-1 items-center justify-center gap-2 rounded-xl border-2 border-gold-bright bg-green-deep px-6 text-base font-semibold text-cream shadow-md transition-colors",
           "hover:bg-green-dark active:translate-y-px focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/50",
+          "disabled:pointer-events-none disabled:opacity-60",
         )}
       >
         {nextLabel}
