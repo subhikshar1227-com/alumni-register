@@ -23,51 +23,38 @@ export function WelcomeScreen({ onStart }: WelcomeScreenProps) {
             <LogoEmblem size={52} />
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-maroon">
-                You&apos;re invited back to
+                25 Years of SVCE.
               </p>
-              <h1 className="mt-1 text-balance font-display text-2xl font-bold leading-tight text-green-deep sm:text-3xl">
-                SVCE Silver Jubilee
+              <h1 className="mt-1 flex items-center gap-2 text-balance font-display text-2xl font-bold leading-tight text-green-deep sm:text-3xl">
+                <span className="min-w-0">SVCE Silver Jubilee</span>
+                <DiyaDecor className="h-7 w-9 shrink-0" />
               </h1>
             </div>
           </div>
 
           <p className="mt-4 text-pretty text-[0.95rem] leading-relaxed text-brown/85">
-            Twenty-five years on, the college is putting together a reunion and wants to know
-            who&apos;s coming. This form takes your batch details and, if you&apos;re joining us,
-            a few notes for the day.
+            A Lifetime of Memories. As SVCE celebrates its Silver Jubilee, we invite our alumni
+            to come back, reconnect and be part of this special milestone.
           </p>
-
-          <div className="my-5 flex items-center justify-center gap-8" aria-hidden="true">
-            <DiyaDecor className="-scale-x-100" />
-            <DiyaDecor />
-          </div>
 
           <OrnamentalDivider className="my-6" />
 
           <div className="border-l-2 border-gold pl-4">
             <h2 className="font-display text-xl font-bold text-green-deep">
-              Alumni Registration
+              ALUMNI REGISTRATION
             </h2>
             <p className="mt-1.5 text-pretty text-sm leading-relaxed text-brown/75">
-              An unofficial, alumni-run effort — not a college department. Your details go
-              towards planning the celebration and your entry pass.
+              Register to attend the Silver Jubilee celebration and receive your Event Entry Pass.
             </p>
           </div>
 
           <div className="mt-4 border-l-2 border-gold pl-4">
-            <h2 className="font-display text-xl font-bold text-green-deep">Alumni Membership</h2>
+            <h2 className="font-display text-xl font-bold text-green-deep">ALUMNI MEMBERSHIP</h2>
             <p className="mt-1.5 text-pretty text-sm leading-relaxed text-brown/75">
-              Can&apos;t join us for the Silver Jubilee celebration? That&apos;s completely okay.
-              We understand that not everyone may be able to make it this time. You can still
-              share your details with us so we can stay connected and keep you in the loop for
-              future alumni gatherings and updates.
+              Unable to attend? Stay connected with the SVCE Alumni Community and receive updates
+              about future gatherings.
             </p>
           </div>
-
-          <p className="mt-4 text-pretty text-sm leading-relaxed text-brown/75">
-            Every alumnus who registers receives a personalised Membership Card and Event Entry
-            Pass, sent to their registered email once verified by the organising batch.
-          </p>
 
           <button
             type="button"
@@ -78,7 +65,6 @@ export function WelcomeScreen({ onStart }: WelcomeScreenProps) {
             <ArrowRight className="size-4" />
           </button>
 
-          <p className="mt-4 text-center text-xs text-brown/60">About two minutes, mostly dropdowns.</p>
         </div>
       </div>
     </div>

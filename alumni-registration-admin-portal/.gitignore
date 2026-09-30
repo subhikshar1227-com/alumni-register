@@ -16,11 +16,8 @@ node_modules
 .DS_Store
 next-env.d.ts
 
-# Uploaded alumni photos (not committed — real registration data)
-/public/uploads/
-
-# Prisma
-/prisma/migrations/dev.db
+# Generated documents (membership cards / entry passes)
+/public/documents/
 
 # Local dev server logs
 dev-*.log

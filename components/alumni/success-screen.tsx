@@ -6,10 +6,11 @@ import { HangingLights, OrnamentalDivider } from "./festive-decor"
 
 type SuccessScreenProps = {
   data: FormData
+  alumniId: string
   onRestart: () => void
 }
 
-export function SuccessScreen({ data, onRestart }: SuccessScreenProps) {
+export function SuccessScreen({ data, alumniId, onRestart }: SuccessScreenProps) {
   return (
     <div className="festive-bg flex min-h-dvh flex-col items-center justify-center px-4 py-8">
       <div className="animate-fade-up w-full max-w-md">
@@ -28,6 +29,12 @@ export function SuccessScreen({ data, onRestart }: SuccessScreenProps) {
             Thanks for filling this in — we&apos;ve got your details on record for the Silver
             Jubilee.
           </p>
+
+          {alumniId && (
+            <div className="mx-auto mt-4 inline-block rounded-lg border border-gold bg-gold/10 px-4 py-2 text-sm font-semibold text-maroon">
+              Alumni ID: {alumniId}
+            </div>
+          )}
 
           <OrnamentalDivider className="my-6" />
 

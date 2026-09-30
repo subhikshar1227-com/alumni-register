@@ -62,25 +62,14 @@ function isValidIndianPhone(phone: string) {
   return /^[6-9]\d{9}$/.test(digits)
 }
 
-function isValidLinkedInUrl(value: string) {
-  try {
-    const url = new URL(value.trim())
-    return (
-      url.protocol === "https:" &&
-      (url.hostname === "linkedin.com" || url.hostname === "www.linkedin.com") &&
-      url.pathname.length > 1
-    )
-  } catch {
-    return false
-  }
-}
-
 export function AlumniRegistration() {
   const [phase, setPhase] = useState<Phase>("welcome")
   const [data, setData] = useState<FormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<Errors>({})
   const [currentStep, setCurrentStep] = useState<StepId>("benefits")
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState("")
+  const [alumniId, setAlumniId] = useState("")
 
   // Active steps depend on the attendance answer.
   const steps = useMemo<StepId[]>(() => {
@@ -100,6 +89,7 @@ export function AlumniRegistration() {
     switch (step) {
       case "name":
         if (!data.name.trim()) e.name = "Please enter your name to continue."
+        if (!data.photo) e.photo = "Please upload a profile photo."
         break
       case "year":
         if (!data.year) e.year = "Please select your batch year."
@@ -128,10 +118,6 @@ export function AlumniRegistration() {
         else if (!isValidEmail(data.email)) e.email = "Please enter a valid email address."
         break
       case "career":
-        if (!data.photo) e.photo = "Please upload a profile photo."
-        if (!data.linkedinUrl.trim()) e.linkedinUrl = "Please enter your LinkedIn profile URL."
-        else if (!isValidLinkedInUrl(data.linkedinUrl))
-          e.linkedinUrl = "Enter a valid https://www.linkedin.com profile URL."
         if (!data.company.trim()) e.company = "Please let us know where you currently work."
         break
       default:
@@ -166,11 +152,44 @@ export function AlumniRegistration() {
 
   const handleSubmit = async () => {
     setSubmitting(true)
-    // No backend yet — simulate a brief submit before showing the success screen.
-    await new Promise((resolve) => setTimeout(resolve, 600))
-    setSubmitting(false)
-    setPhase("success")
-    window.scrollTo({ top: 0, behavior: "smooth" })
+    setSubmitError("")
+    try {
+      const body = new window.FormData()
+      body.set("name", data.name)
+      body.set("year", data.year)
+      body.set("branch", data.branch)
+      body.set("usn", data.usn)
+      body.set("attending", data.attending)
+      if (data.attending === "yes") {
+        body.set("peopleCount", data.peopleCount === "Other" ? data.peopleOther : data.peopleCount)
+        body.set("food", data.food)
+      }
+      body.set("phone", data.phone)
+      body.set("email", data.email)
+      body.set("company", data.company)
+      body.set("position", data.position)
+      body.set("awards", data.awards)
+      body.set("experience", data.experience)
+      body.set("linkedinUrl", data.linkedinUrl)
+      if (data.photo) body.set("photo", data.photo)
+
+      const response = await fetch("/api/alumni/register", { method: "POST", body })
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Could not submit your registration. Please try again.")
+      }
+
+      setAlumniId(result.alumniId ?? "")
+      setPhase("success")
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    } catch (submitErr) {
+      setSubmitError(
+        submitErr instanceof Error ? submitErr.message : "Could not submit your registration. Please try again.",
+      )
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleStart = () => {
@@ -181,12 +200,14 @@ export function AlumniRegistration() {
   const handleRestart = () => {
     setData(INITIAL_FORM_DATA)
     setErrors({})
+    setSubmitError("")
+    setAlumniId("")
     setCurrentStep("benefits")
     setPhase("welcome")
   }
 
   if (phase === "welcome") return <WelcomeScreen onStart={handleStart} />
-  if (phase === "success") return <SuccessScreen data={data} onRestart={handleRestart} />
+  if (phase === "success") return <SuccessScreen data={data} alumniId={alumniId} onRestart={handleRestart} />
 
   return (
     <div className="festive-bg min-h-dvh px-4 py-6 sm:py-9">
@@ -228,6 +249,55 @@ export function AlumniRegistration() {
                   autoFocus
                   onEnter={goNext}
                 />
+                <div className="w-full">
+                  <label htmlFor="photo" className="mb-2 flex items-center gap-2 text-sm font-semibold text-green-deep">
+                    Profile photo
+                    <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[0.7rem] font-medium text-maroon">
+                      Required
+                    </span>
+                  </label>
+                  <label
+                    htmlFor="photo"
+                    className={cn(
+                      "relative flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border-2 border-dashed bg-ivory px-4 py-3 text-sm text-brown transition-colors hover:border-green-deep focus-within:ring-4 focus-within:ring-gold/25",
+                      errors.photo ? "border-destructive" : "border-gold/60",
+                    )}
+                  >
+                    <Upload className="size-5 shrink-0 text-green-deep" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {data.photo ? data.photo.name : "Choose a clear photo (JPG, PNG or WEBP, up to 5 MB)"}
+                    </span>
+                    <input
+                      id="photo"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                      aria-required="true"
+                      aria-invalid={!!errors.photo}
+                      aria-describedby={errors.photo ? "photo-error" : undefined}
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0] ?? null
+                        if (file && (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024)) {
+                          update("photo", null)
+                          setErrors((prev) => ({
+                            ...prev,
+                            photo: file.size > 5 * 1024 * 1024
+                              ? "Photo must be 5 MB or smaller."
+                              : "Choose an image file in JPG, PNG or WEBP format.",
+                          }))
+                          event.currentTarget.value = ""
+                          return
+                        }
+                        update("photo", file)
+                      }}
+                    />
+                  </label>
+                  {errors.photo && (
+                    <p id="photo-error" className="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive" role="alert">
+                      {errors.photo}
+                    </p>
+                  )}
+                </div>
               </FormStep>
             )}
 
@@ -412,65 +482,15 @@ export function AlumniRegistration() {
             {currentStep === "career" && (
               <FormStep
                 title="Tell us about your journey"
-                subtitle="Add a profile photo and LinkedIn URL. The other details help us introduce you to the alumni community."
+                subtitle="Share your LinkedIn profile and career details to help us introduce you to the alumni community."
               >
-                <div className="w-full">
-                  <label htmlFor="photo" className="mb-2 flex items-center gap-2 text-sm font-semibold text-green-deep">
-                    Profile photo
-                    <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[0.7rem] font-medium text-maroon">
-                      Required
-                    </span>
-                  </label>
-                  <label
-                    htmlFor="photo"
-                    className={cn(
-                      "relative flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border-2 border-dashed bg-ivory px-4 py-3 text-sm text-brown transition-colors hover:border-green-deep focus-within:ring-4 focus-within:ring-gold/25",
-                      errors.photo ? "border-destructive" : "border-gold/60",
-                    )}
-                  >
-                    <Upload className="size-5 shrink-0 text-green-deep" aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate">
-                      {data.photo ? data.photo.name : "Choose a clear photo (JPG, PNG or WEBP, up to 5 MB)"}
-                    </span>
-                    <input
-                      id="photo"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="absolute inset-0 cursor-pointer opacity-0"
-                      aria-required="true"
-                      aria-invalid={!!errors.photo}
-                      aria-describedby={errors.photo ? "photo-error" : undefined}
-                      onChange={(event) => {
-                        const file = event.currentTarget.files?.[0] ?? null
-                        if (file && (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024)) {
-                          update("photo", null)
-                          setErrors((prev) => ({
-                            ...prev,
-                            photo: file.size > 5 * 1024 * 1024
-                              ? "Photo must be 5 MB or smaller."
-                              : "Choose an image file in JPG, PNG or WEBP format.",
-                          }))
-                          event.currentTarget.value = ""
-                          return
-                        }
-                        update("photo", file)
-                      }}
-                    />
-                  </label>
-                  {errors.photo && (
-                    <p id="photo-error" className="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive" role="alert">
-                      {errors.photo}
-                    </p>
-                  )}
-                </div>
                 <TextInput
                   id="linkedinUrl"
-                  label="LinkedIn profile URL"
+                  label="LinkedIn profile"
                   value={data.linkedinUrl}
                   onChange={(v) => update("linkedinUrl", v)}
                   placeholder="https://www.linkedin.com/in/your-name"
-                  type="url"
-                  inputMode="url"
+                  optional
                   error={errors.linkedinUrl}
                   autoFocus
                 />
@@ -514,16 +534,21 @@ export function AlumniRegistration() {
             {currentStep === "review" && (
               <FormStep
                 title="Almost done!"
-                subtitle="Here's what your alumni membership brings you."
+                subtitle="Review the details below, then submit your registration."
               >
-                <FinalInfoCard />
+                <FinalInfoCard data={data} />
+                {submitError && (
+                  <p className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive" role="alert">
+                    {submitError}
+                  </p>
+                )}
               </FormStep>
             )}
 
             <NavigationButtons
               onBack={goBack}
               onNext={currentStep === "review" ? handleSubmit : goNext}
-              nextLabel={currentStep === "review" ? (submitting ? "Submitting…" : "Complete Registration") : "Continue"}
+              nextLabel={currentStep === "review" ? (submitting ? "Submitting…" : "Submit Registration") : "Continue"}
               isLast={currentStep === "review"}
               disabled={submitting}
             />

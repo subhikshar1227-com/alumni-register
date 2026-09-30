@@ -1,0 +1,127 @@
+// SVCE Alumni 2026 — shared database schema.
+//
+// This file is the single source of truth for the database structure.
+// It is intentionally duplicated (byte-for-byte) into
+// `alumni-registration-admin-portal/prisma/schema.prisma` because the two
+// apps are separate Next.js projects with separate `node_modules` / Prisma
+// clients that both read the SAME PostgreSQL database via DATABASE_URL.
+//
+// Migrations are only ever generated/run from THIS app (alumni_2026).
+// The admin portal only runs `prisma generate` (never `migrate`) against
+// this same schema file. If you change this file, copy it over to the
+// admin portal's prisma/schema.prisma too and re-run `prisma generate`
+// in both projects.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum FoodPreference {
+  VEG
+  NON_VEG
+}
+
+// Lifecycle of a generated document (membership card / entry pass).
+enum DocumentStatus {
+  NOT_APPLICABLE // entry pass only: alumnus is not attending
+  NOT_GENERATED
+  GENERATED
+  SENT
+}
+
+enum EmailType {
+  REGISTRATION_ACKNOWLEDGEMENT
+  MEMBERSHIP_CARD
+  ENTRY_PASS
+  REJECTION
+  OTHER
+}
+
+enum EmailLogStatus {
+  SENT
+  FAILED
+}
+
+model AlumniRegistration {
+  id       String @id @default(cuid())
+  alumniId String @unique // e.g. SVCE-ALM-000001, generated once, never changes
+
+  // Personal details
+  name      String
+  batchYear Int
+  branch    String
+  usn       String?
+  photoUrl  String? // public URL served by the alumni_2026 app
+  photoPath String? // path on disk, relative to PHOTO_STORAGE_DIR
+
+  // Event details — peopleCount/food are only meaningful when attending = true
+  attending   Boolean
+  peopleCount Int?
+  food        FoodPreference?
+
+  // Contact details
+  phone String
+  email String
+
+  // Professional details
+  company     String
+  position    String?
+  awards      String?
+  experience  String?
+  linkedinUrl String?
+
+  // Registration workflow
+  status          RegistrationStatus @default(PENDING)
+  rejectionReason String?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+
+  // Document workflow — entryPassStatus starts NOT_APPLICABLE when not attending
+  membershipStatus   DocumentStatus @default(NOT_GENERATED)
+  membershipCardPath String?
+  entryPassStatus    DocumentStatus @default(NOT_GENERATED)
+  entryPassPath      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emailLogs EmailLog[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Single-row counter used to atomically generate sequential Alumni IDs
+// (e.g. SVCE-ALM-000001) via an UPSERT — see lib/server/alumni-id.ts.
+model AlumniIdCounter {
+  id    Int @id @default(1)
+  value Int @default(0)
+}
+
+model EmailLog {
+  id             String    @id @default(cuid())
+  registrationId String
+  registration   AlumniRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  emailType      EmailType
+  recipient      String
+  subject        String
+  status         EmailLogStatus
+  failureReason  String?
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([registrationId])
+}
