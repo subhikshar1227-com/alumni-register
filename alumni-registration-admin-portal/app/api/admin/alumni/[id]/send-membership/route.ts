@@ -23,6 +23,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       batchYear: registration.batchYear,
       branch: registration.branch,
       usn: registration.usn,
+      phone: registration.phone,
       photoUrl: registration.photoUrl,
     })
     documentPath = generated.documentPath

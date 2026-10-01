@@ -12,6 +12,7 @@ type CardInput = {
   batchYear: number
   branch: string
   usn: string | null
+  phone?: string
   photoUrl: string | null
 }
 
@@ -50,6 +51,21 @@ async function fetchPhotoDataUri(photoUrl: string | null): Promise<string | null
   }
 }
 
+async function readImageDataUri(filePath: string): Promise<string | null> {
+  try {
+    const extension = path.extname(filePath).toLowerCase()
+    const contentType = extension === ".png"
+      ? "image/png"
+      : extension === ".webp"
+        ? "image/webp"
+        : "image/jpeg"
+    const buffer = await readFile(filePath)
+    return `data:${contentType};base64,${buffer.toString("base64")}`
+  } catch {
+    return null
+  }
+}
+
 async function qrDataUri(text: string): Promise<string> {
   return QRCode.toDataURL(text, { margin: 1, width: 200 })
 }
@@ -74,34 +90,141 @@ async function saveDocument(buffer: Buffer, filename: string) {
 }
 
 export async function generateMembershipCard(input: CardInput) {
-  const [photoDataUri, qrCode] = await Promise.all([
+  const [photoDataUri, qrCode, logoDataUri, campusDataUri] = await Promise.all([
     fetchPhotoDataUri(input.photoUrl),
     qrDataUri(input.alumniId),
+    readImageDataUri(path.join(process.cwd(), "logo.png")),
+    readImageDataUri(path.join(process.cwd(), "public", "campus.jpg")),
   ])
 
   const name = escapeXml(input.name)
-  const usn = escapeXml(input.usn ?? "—")
+  const usn = escapeXml(input.usn ?? "")
   const branch = escapeXml(input.branch)
+  const phone = escapeXml(input.phone ? `+91 ${input.phone}` : "")
 
   const photoMarkup = photoDataUri
-    ? `<clipPath id="photoClip"><circle cx="135" cy="320" r="71" /></clipPath><image href="${photoDataUri}" x="64" y="249" width="142" height="142" clip-path="url(#photoClip)" preserveAspectRatio="xMidYMid slice" />`
-    : `<circle cx="135" cy="320" r="71" fill="#eaf3f7"/><text x="135" y="337" text-anchor="middle" fill="#087fae" font-size="48" font-weight="700">${escapeXml(initialsOf(input.name))}</text>`
+    ? `<image href="${photoDataUri}" x="60" y="280" width="140" height="140" clip-path="url(#portraitClip)" preserveAspectRatio="xMidYMid slice" />`
+    : `<circle cx="130" cy="350" r="70" fill="#f8f6f0"/><text x="130" y="365" text-anchor="middle" fill="#1a365d" font-size="36" font-weight="700">${escapeXml(initialsOf(input.name))}</text>`
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1011" height="638" viewBox="0 0 1011 638" role="img" aria-label="SVCE Alumni Membership Card for ${name}">
-    <title>SVCE Alumni Membership Card - ${name}</title>
-    <rect width="1011" height="638" rx="36" fill="#101a2d"/>
-    <path d="M36 0h939a36 36 0 0 1 36 36v168H0V36A36 36 0 0 1 36 0" fill="#087fae"/>
-    <text x="64" y="78" fill="#fff" font-size="24" font-weight="700" letter-spacing="2">SVCE BENGALURU</text>
-    <text x="64" y="125" fill="#d8edf4" font-size="18">ALUMNI MEMBERSHIP CARD · 25TH SILVER JUBILEE</text>
-    ${photoMarkup}
-    <text x="246" y="284" fill="#fff" font-size="35" font-weight="700">${name}</text>
-    <text x="246" y="330" fill="#d8edf4" font-size="21">Alumni ID  ${escapeXml(input.alumniId)}</text>
-    <text x="246" y="374" fill="#d8edf4" font-size="21">USN  ${usn}  ·  Batch  ${input.batchYear}</text>
-    <text x="246" y="418" fill="#d8edf4" font-size="21">Branch  ${branch}</text>
-    <path d="M64 506h743" stroke="#2c3b50" stroke-width="2"/>
-    <text x="64" y="562" fill="#39b6ee" font-size="18" font-weight="700" letter-spacing="1">SILVER JUBILEE · 25 YEARS</text>
-    <text x="64" y="596" fill="#8ea0b4" font-size="15">Valid for alumni identification</text>
-    <image href="${qrCode}" x="855" y="480" width="100" height="100" />
+  const campusMarkup = campusDataUri
+    ? `<image href="${campusDataUri}" x="230" y="150" width="570" height="250" clip-path="url(#campusClip)" preserveAspectRatio="xMidYMid slice" />`
+    : `<rect x="230" y="150" width="570" height="250" fill="#1a365d"/><text x="515" y="275" text-anchor="middle" fill="#d4af37" font-family="serif" font-size="24" letter-spacing="2">SVCE CAMPUS</text>`
+
+  const logoMarkup = logoDataUri
+    ? `<image href="${logoDataUri}" x="40" y="25" width="80" height="90" preserveAspectRatio="xMidYMid meet" />`
+    : `<circle cx="80" cy="70" r="40" fill="#d4af37"/><text x="80" y="80" text-anchor="middle" fill="#1a365d" font-size="20" font-weight="700">SVCE</text>`
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="640" viewBox="0 0 1024 640" role="img" aria-label="SVCE Alumni Card for ${name}">
+    <title>SVCE Alumni Card - ${name}</title>
+    <defs>
+      <clipPath id="cardClip"><rect width="1024" height="640" rx="24"/></clipPath>
+      <clipPath id="portraitClip"><rect x="60" y="280" width="140" height="140" rx="12"/></clipPath>
+      <clipPath id="campusClip"><path d="M230 150h570v200c0 27.614-22.386 50-50 50H280c-27.614 0-50-22.386-50-50V150z"/></clipPath>
+      <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#1a365d;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#2c5282;stop-opacity:1" />
+      </linearGradient>
+      <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#f6e05e;stop-opacity:1" />
+        <stop offset="50%" style="stop-color:#d4af37;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#b7791f;stop-opacity:1" />
+      </linearGradient>
+      <linearGradient id="silverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#e2e8f0;stop-opacity:1" />
+        <stop offset="50%" style="stop-color:#cbd5e0;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#a0aec0;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <g clip-path="url(#cardClip)">
+      <!-- Card Background -->
+      <rect width="1024" height="640" fill="#f8f6f0"/>
+      
+      <!-- Header Section -->
+      <rect width="1024" height="150" fill="url(#headerGrad)"/>
+      
+      <!-- Logo -->
+      ${logoMarkup}
+      
+      <!-- College Name -->
+      <text x="140" y="50" fill="#ffffff" font-size="32" font-weight="700" letter-spacing="1">SRI VENKATESHWARA</text>
+      <text x="140" y="80" fill="#ffffff" font-size="32" font-weight="700" letter-spacing="1">COLLEGE OF ENGINEERING</text>
+      <text x="140" y="105" fill="#cbd5e0" font-size="16" letter-spacing="2">BENGALURU</text>
+      <text x="140" y="125" fill="#a0aec0" font-size="12" letter-spacing="1">KNOWLEDGE • INNOVATION • A BETTER TOMORROW</text>
+      
+      <!-- Silver Jubilee Badge -->
+      <circle cx="870" cy="75" r="60" fill="url(#goldGrad)" stroke="#b7791f" stroke-width="3"/>
+      <path d="M830,45 Q830,35 840,35 L900,35 Q910,35 910,45 L910,105 Q910,115 900,115 L840,115 Q830,115 830,105 Z" fill="none" stroke="#b7791f" stroke-width="2"/>
+      <text x="870" y="60" text-anchor="middle" fill="#1a365d" font-family="serif" font-size="48" font-weight="700">25</text>
+      <text x="870" y="75" text-anchor="middle" fill="#1a365d" font-size="10" letter-spacing="1">th</text>
+      <text x="870" y="90" text-anchor="middle" fill="#1a365d" font-family="serif" font-size="14" font-style="italic">Silver Jubilee</text>
+      <text x="870" y="108" text-anchor="middle" fill="#1a365d" font-size="10" letter-spacing="1">2001 - 2026</text>
+      
+      <!-- Decorative Elements -->
+      <path d="M10,130 Q200,140 500,135 T1014,130" fill="none" stroke="url(#goldGrad)" stroke-width="4"/>
+      
+      <!-- Campus Image Section -->
+      ${campusMarkup}
+      
+      <!-- Curved Transition -->
+      <path d="M230 400 Q400 380 600 385 T1024 390 V640 H230 Z" fill="#f8f6f0"/>
+      <path d="M230 395 Q400 375 600 380 T1024 385" fill="none" stroke="url(#goldGrad)" stroke-width="3"/>
+      
+      <!-- Alumni Card Title Banner -->
+      <rect x="320" y="340" width="460" height="50" rx="25" fill="#1a365d"/>
+      <rect x="325" y="345" width="450" height="40" rx="20" fill="url(#goldGrad)"/>
+      <text x="550" y="370" text-anchor="middle" fill="#1a365d" font-size="24" font-weight="700" letter-spacing="2">♦ SVCE ALUMNI CARD ♦</text>
+      
+      <!-- Alumni Photo -->
+      <rect x="55" y="275" width="150" height="150" rx="12" fill="url(#goldGrad)" stroke="#b7791f" stroke-width="3"/>
+      <rect x="60" y="280" width="140" height="140" rx="8" fill="#ffffff"/>
+      ${photoMarkup}
+      
+      <!-- Alumni Information Section -->
+      <text x="250" y="460" fill="#1a365d" font-size="14" font-weight="700">Alumni Name</text>
+      <text x="380" y="460" fill="#2d3748" font-size="18" font-weight="600" textLength="420" lengthAdjust="spacingAndGlyphs">${name}</text>
+      
+      <text x="250" y="485" fill="#1a365d" font-size="14" font-weight="700">Alumni ID</text>
+      <text x="380" y="485" fill="#2d3748" font-size="16" font-weight="600">${escapeXml(input.alumniId)}</text>
+      
+      ${usn ? `<text x="250" y="510" fill="#1a365d" font-size="14" font-weight="700">USN (Optional)</text>
+      <text x="380" y="510" fill="#2d3748" font-size="16" font-weight="600">${usn}</text>` : ''}
+      
+      <text x="250" y="${usn ? '535' : '510'}" fill="#1a365d" font-size="14" font-weight="700">Branch</text>
+      <text x="380" y="${usn ? '535' : '510'}" fill="#2d3748" font-size="16" textLength="420" lengthAdjust="spacingAndGlyphs">${branch}</text>
+      
+      <text x="250" y="${usn ? '560' : '535'}" fill="#1a365d" font-size="14" font-weight="700">Year of Graduation</text>
+      <text x="380" y="${usn ? '560' : '535'}" fill="#2d3748" font-size="16" font-weight="600">${input.batchYear}</text>
+      
+      ${phone ? `<text x="250" y="${usn ? '585' : '560'}" fill="#1a365d" font-size="14" font-weight="700">Contact Number</text>
+      <text x="380" y="${usn ? '585' : '560'}" fill="#2d3748" font-size="16" font-weight="600">${phone}</text>` : ''}
+      
+      <!-- QR Code Section -->
+      <rect x="830" y="430" width="150" height="150" rx="12" fill="#ffffff" stroke="url(#goldGrad)" stroke-width="3"/>
+      <image href="${qrCode}" x="845" y="445" width="120" height="120" />
+      <text x="905" y="600" text-anchor="middle" fill="#1a365d" font-size="11" font-weight="700" letter-spacing="1">SCAN FOR VERIFICATION</text>
+      
+      <!-- Tagline -->
+      <text x="130" y="490" text-anchor="middle" fill="#d4af37" font-family="serif" font-size="14" font-style="italic" transform="rotate(-90 130 490)">Once an SVCEian,</text>
+      <text x="130" y="520" text-anchor="middle" fill="#d4af37" font-family="serif" font-size="14" font-style="italic" transform="rotate(-90 130 520)">Always an SVCEian</text>
+      <path d="M110,460 L110,540" stroke="url(#goldGrad)" stroke-width="2"/>
+      
+      <!-- Footer -->
+      <rect x="0" y="590" width="1024" height="50" fill="url(#headerGrad)"/>
+      <text x="80" y="610" fill="#d4af37" font-size="12" font-weight="700">LIFELONG</text>
+      <text x="80" y="625" fill="#cbd5e0" font-size="10">CONNECTIONS</text>
+      
+      <text x="280" y="610" fill="#d4af37" font-size="12" font-weight="700">LEARNING BEYOND</text>
+      <text x="280" y="625" fill="#cbd5e0" font-size="10">CLASSROOMS</text>
+      
+      <text x="520" y="610" fill="#d4af37" font-size="12" font-weight="700">NETWORK</text>
+      <text x="520" y="625" fill="#cbd5e0" font-size="10">FOR GROWTH</text>
+      
+      <text x="720" y="610" fill="#d4af37" font-size="12" font-weight="700">CONTRIBUTE TO A</text>
+      <text x="720" y="625" fill="#cbd5e0" font-size="10">BRIGHTER TOMORROW</text>
+      
+      <!-- Card Border -->
+      <rect x="4" y="4" width="1016" height="632" rx="20" fill="none" stroke="url(#goldGrad)" stroke-width="4"/>
+    </g>
   </svg>`
 
   const buffer = renderPng(svg)
