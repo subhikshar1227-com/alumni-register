@@ -69,7 +69,6 @@ export function AlumniRegistration() {
   const [currentStep, setCurrentStep] = useState<StepId>("benefits")
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState("")
-  const [alumniId, setAlumniId] = useState("")
 
   // Active steps depend on the attendance answer.
   const steps = useMemo<StepId[]>(() => {
@@ -180,7 +179,6 @@ export function AlumniRegistration() {
         throw new Error(result?.error || "Could not submit your registration. Please try again.")
       }
 
-      setAlumniId(result.alumniId ?? "")
       setPhase("success")
       window.scrollTo({ top: 0, behavior: "smooth" })
     } catch (submitErr) {
@@ -201,13 +199,12 @@ export function AlumniRegistration() {
     setData(INITIAL_FORM_DATA)
     setErrors({})
     setSubmitError("")
-    setAlumniId("")
     setCurrentStep("benefits")
     setPhase("welcome")
   }
 
   if (phase === "welcome") return <WelcomeScreen onStart={handleStart} />
-  if (phase === "success") return <SuccessScreen data={data} alumniId={alumniId} onRestart={handleRestart} />
+  if (phase === "success") return <SuccessScreen data={data} onRestart={handleRestart} />
 
   return (
     <div className="festive-bg min-h-dvh px-4 py-6 sm:py-9">

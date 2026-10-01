@@ -1,13 +1,17 @@
-// SVCE Alumni 2026 — shared database schema (COPY).
+// SVCE Alumni 2026 — shared database schema.
 //
-// This is a byte-for-byte copy of ../../prisma/schema.prisma (alumni_2026).
-// The two apps are separate Next.js projects with separate node_modules /
-// Prisma clients that both read the SAME PostgreSQL database (DATABASE_URL).
+// This file is the single source of truth for the database structure.
+// It is intentionally duplicated (byte-for-byte) into
+// `alumni-registration-admin-portal/prisma/schema.prisma` because the two
+// apps are separate Next.js projects with separate `node_modules` / Prisma
+// clients that both read the SAME PostgreSQL database via DATABASE_URL.
 //
-// Migrations are only ever generated/run from alumni_2026. This app only
-// runs `prisma generate` against this file (never `migrate`). If the
-// alumni_2026 schema changes, copy it here again and re-run `prisma
-// generate` in both projects.
+// Migrations are only ever generated/run from THIS app (alumni_2026).
+// The admin portal only runs `prisma generate` (never `migrate`) against
+// this same schema file. Edit ONLY this copy — the admin portal's
+// prisma/schema.prisma is auto-synced from this file (see its
+// scripts/sync-schema.js, wired into its dev/build/db:generate scripts),
+// so it is a build artifact, never hand-edited.
 
 generator client {
   provider = "prisma-client-js"
@@ -51,8 +55,8 @@ enum EmailLogStatus {
 }
 
 model AlumniRegistration {
-  id       String @id @default(cuid())
-  alumniId String @unique // e.g. SVCE-ALM-000001, generated once, never changes
+  id       String  @id @default(cuid())
+  alumniId String? @unique // e.g. SVCE-ALM-000001 — null until admin approval, then set once and never changes
 
   // Personal details
   name      String
@@ -89,6 +93,11 @@ model AlumniRegistration {
   membershipCardPath String?
   entryPassStatus    DocumentStatus @default(NOT_GENERATED)
   entryPassPath      String?
+
+  // Event-day check-in — set when the Entry Pass QR is scanned at the gate
+  // and the coordinator confirms arrival (see admin /checkin/[alumniId]).
+  checkedIn   Boolean   @default(false)
+  checkedInAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -25,6 +25,8 @@ export function serializeRegistration(registration: AlumniRegistration) {
     membershipCardUrl: registration.membershipCardPath ? `/${registration.membershipCardPath}` : null,
     entryPassStatus: registration.entryPassStatus,
     entryPassUrl: registration.entryPassPath ? `/${registration.entryPassPath}` : null,
+    checkedIn: registration.checkedIn,
+    checkedInAt: registration.checkedInAt,
     createdAt: registration.createdAt,
     updatedAt: registration.updatedAt,
     approvedAt: registration.approvedAt,

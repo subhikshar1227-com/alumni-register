@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/server/db"
 import { registrationSchema } from "@/lib/server/validation"
-import { generateAlumniId } from "@/lib/server/alumni-id"
 import { savePhoto } from "@/lib/server/photo-storage"
 import { sendEmail } from "@/lib/server/mailer"
 import { registrationAcknowledgementEmail } from "@/lib/server/email-templates"
@@ -74,11 +73,9 @@ export async function POST(request: Request) {
   }
 
   const attending = data.attending === "yes"
-  const alumniId = await generateAlumniId()
 
   const registration = await prisma.alumniRegistration.create({
     data: {
-      alumniId,
       name: data.name,
       batchYear: data.year,
       branch: data.branch,

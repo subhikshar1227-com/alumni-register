@@ -16,17 +16,24 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   if (!registration.attending) {
     return NextResponse.json({ error: "Entry pass is not applicable — this alumnus is not attending." }, { status: 409 })
   }
+  if (!registration.alumniId) {
+    return NextResponse.json({ error: "Alumni ID is missing for this approved registration." }, { status: 500 })
+  }
+  const alumniId = registration.alumniId
 
   // Reuse the existing pass if one was already generated; never create a duplicate.
   let documentPath = registration.entryPassPath
   if (!documentPath || registration.entryPassStatus === "NOT_GENERATED") {
     const generated = await generateEntryPass({
-      alumniId: registration.alumniId,
+      alumniId,
       name: registration.name,
       batchYear: registration.batchYear,
       branch: registration.branch,
       usn: registration.usn,
+      phone: registration.phone,
       photoUrl: registration.photoUrl,
+      company: registration.company,
+      position: registration.position,
     })
     documentPath = generated.documentPath
     registration = await prisma.alumniRegistration.update({

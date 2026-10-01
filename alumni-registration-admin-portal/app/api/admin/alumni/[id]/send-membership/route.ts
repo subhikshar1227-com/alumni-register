@@ -13,18 +13,24 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   if (registration.status !== "APPROVED") {
     return NextResponse.json({ error: "Only approved registrations can be sent a membership card." }, { status: 409 })
   }
+  if (!registration.alumniId) {
+    return NextResponse.json({ error: "Alumni ID is missing for this approved registration." }, { status: 500 })
+  }
+  const alumniId = registration.alumniId
 
   // Reuse the existing card if one was already generated; never create a duplicate.
   let documentPath = registration.membershipCardPath
   if (!documentPath || registration.membershipStatus === "NOT_GENERATED") {
     const generated = await generateMembershipCard({
-      alumniId: registration.alumniId,
+      alumniId,
       name: registration.name,
       batchYear: registration.batchYear,
       branch: registration.branch,
       usn: registration.usn,
       phone: registration.phone,
       photoUrl: registration.photoUrl,
+      company: registration.company,
+      position: registration.position,
     })
     documentPath = generated.documentPath
     registration = await prisma.alumniRegistration.update({

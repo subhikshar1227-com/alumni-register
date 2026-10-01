@@ -57,18 +57,21 @@ export function FinalInfoCard({ data }: { data: FormData }) {
       <dl className="mt-3 divide-y divide-gold/35">
         <div className="grid grid-cols-[minmax(6rem,0.38fr)_minmax(0,1fr)] gap-3 py-3 first:pt-0">
           <dt className="text-sm font-semibold text-green-deep">Profile photo</dt>
-          <dd className="flex min-w-0 items-center gap-3 text-sm text-brown/85">
-            {photoPreview && (
-              <Image
-                src={photoPreview}
-                alt="Uploaded profile photo"
-                width={56}
-                height={56}
-                unoptimized
-                className="size-14 shrink-0 rounded-lg border border-gold/50 object-cover"
-              />
+          <dd className="min-w-0 text-sm text-brown/85">
+            {photoPreview ? (
+              <div className="aspect-square w-28 overflow-hidden rounded-xl border border-gold/50 sm:w-36">
+                <Image
+                  src={photoPreview}
+                  alt="Uploaded profile photo"
+                  width={288}
+                  height={288}
+                  unoptimized
+                  className="size-full object-cover"
+                />
+              </div>
+            ) : (
+              <span>No photo uploaded</span>
             )}
-            <span className="break-all">{data.photo?.name ?? "No photo uploaded"}</span>
           </dd>
         </div>
         {details.map(({ label, value }) => (

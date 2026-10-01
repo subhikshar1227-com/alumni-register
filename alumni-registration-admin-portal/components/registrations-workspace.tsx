@@ -7,6 +7,7 @@ import {
   Eye,
   IdCard,
   Mail,
+  MailCheck,
   Moon,
   Send,
   Sun,
@@ -32,14 +33,62 @@ function statusClasses(status: RegistrationStatus, theme: 'dark' | 'light') {
   return map[status]
 }
 
-function documentStatusLabel(status: DocumentStatus) {
-  const labels: Record<DocumentStatus, string> = {
-    NOT_APPLICABLE: 'Not applicable',
-    NOT_GENERATED: 'Not generated',
-    GENERATED: 'Generated',
-    SENT: 'Sent',
+// Ticks represent EMAIL SEND status only (never "generated but not sent" —
+// generation is an internal backend step, not something the admin tracks).
+// membershipStatus/entryPassStatus only ever reach SENT after a real
+// successful send (see send-membership/send-entry-pass routes), so this is
+// always backed by actual delivery, never just a button click.
+function DocSentIcon({ status, isDark }: { status: DocumentStatus; isDark: boolean }) {
+  if (status === 'SENT') {
+    return <Check className={`size-4 ${isDark ? 'text-[#45d2aa]' : 'text-[#16805f]'}`} aria-hidden="true" />
   }
-  return labels[status]
+  if (status === 'NOT_APPLICABLE') {
+    return <span className={`text-[11px] font-semibold ${isDark ? 'text-[#5a6880]' : 'text-[#a5adb7]'}`}>N/A</span>
+  }
+  return <span className={isDark ? 'text-[#5a6880]' : 'text-[#a5adb7]'}>—</span>
+}
+
+// Latest email attempt for a given type, from the already-loaded email
+// history (API already orders these newest-first) — used to tell a real
+// send failure apart from "never attempted".
+function latestEmailStatus(logs: EmailLogEntry[], type: EmailLogEntry['emailType']) {
+  return logs.find((log) => log.emailType === type)?.status ?? null
+}
+
+// "✓ Sent / Failed / — Not Sent" badge used in the detail modal — the three
+// states Part 18 asks the UI to distinguish.
+function SendStatusBadge({ sent, failed, isDark }: { sent: boolean; failed: boolean; isDark: boolean }) {
+  if (sent) {
+    return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${isDark ? 'bg-[#16805f]/20 text-[#45d2aa]' : 'bg-[#16805f]/10 text-[#16805f]'}`}>✓ Sent</span>
+  }
+  if (failed) {
+    return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${isDark ? 'bg-[#80433d]/30 text-[#ff9b8f]' : 'bg-[#9a3f31]/10 text-[#9a3f31]'}`}>Failed</span>
+  }
+  return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${isDark ? 'bg-[#1d293d] text-[#5a6880]' : 'bg-[#eef2f6] text-[#a5adb7]'}`}>— Not Sent</span>
+}
+
+// Row status color, derived purely from database state (never from a button
+// click): green once fully complete, red once rejected, orange otherwise
+// (pending, or approved with an incomplete document/email workflow).
+function rowTone(registration: AlumniRegistration): 'green' | 'orange' | 'red' {
+  if (registration.status === 'REJECTED') return 'red'
+  if (
+    registration.status === 'APPROVED' &&
+    registration.membershipStatus === 'SENT' &&
+    (registration.entryPassStatus === 'SENT' || registration.entryPassStatus === 'NOT_APPLICABLE')
+  ) {
+    return 'green'
+  }
+  return 'orange'
+}
+
+function rowToneClasses(tone: 'green' | 'orange' | 'red', isDark: boolean) {
+  const map = {
+    green: isDark ? 'border-l-4 border-l-[#16805f] bg-[#16805f]/[0.07]' : 'border-l-4 border-l-[#16805f] bg-[#16805f]/[0.045]',
+    orange: isDark ? 'border-l-4 border-l-[#c98a1f] bg-[#c98a1f]/[0.07]' : 'border-l-4 border-l-[#c98a1f] bg-[#c98a1f]/[0.045]',
+    red: isDark ? 'border-l-4 border-l-[#9a3f31] bg-[#9a3f31]/[0.07]' : 'border-l-4 border-l-[#9a3f31] bg-[#9a3f31]/[0.045]',
+  }
+  return map[tone]
 }
 
 function formatDate(value: string | null) {
@@ -47,7 +96,7 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 }
 
-export default function RegistrationsWorkspace({ view }: { view: 'dashboard' | 'registrations' }) {
+export default function RegistrationsWorkspace() {
   const [registrations, setRegistrations] = useState<AlumniRegistration[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -151,17 +200,35 @@ export default function RegistrationsWorkspace({ view }: { view: 'dashboard' | '
     setRejectionReason('')
   }
 
-  function generateMembership(registration: AlumniRegistration) {
-    runAction('generate-membership', () => registrationService.generateMembership(registration.id), () => 'Membership card generated.')
-  }
+  // Generation is an internal backend step — these Send actions handle it
+  // automatically when needed (see send-membership/send-entry-pass routes),
+  // so there is no separate Generate step or button in this UI.
   function sendMembership(registration: AlumniRegistration) {
     runAction('send-membership', () => registrationService.sendMembership(registration.id), (r) => `Membership card emailed to ${r.email}.`)
   }
-  function generateEntryPass(registration: AlumniRegistration) {
-    runAction('generate-entry-pass', () => registrationService.generateEntryPass(registration.id), () => 'Entry pass generated.')
-  }
   function sendEntryPass(registration: AlumniRegistration) {
     runAction('send-entry-pass', () => registrationService.sendEntryPass(registration.id), (r) => `Entry pass emailed to ${r.email}.`)
+  }
+
+  // Reuses the exact same idempotent send endpoints as the individual
+  // buttons — no email or document-generation logic is duplicated. The
+  // entry pass half is skipped when NOT_APPLICABLE (alumnus not attending).
+  async function sendBoth(registration: AlumniRegistration) {
+    setBusy('send-both')
+    setError('')
+    try {
+      let updated = await registrationService.sendMembership(registration.id)
+      updateInPlace(updated)
+      if (updated.entryPassStatus !== 'NOT_APPLICABLE') {
+        updated = await registrationService.sendEntryPass(registration.id)
+        updateInPlace(updated)
+      }
+      setNotice(`${updated.name}'s documents have been emailed.`)
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'This action could not be completed.')
+    } finally {
+      setBusy('')
+    }
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -170,7 +237,7 @@ export default function RegistrationsWorkspace({ view }: { view: 'dashboard' | '
     <section className="w-full min-w-0" aria-labelledby="roster-title">
       <div className={`rounded-[18px] px-5 py-6 shadow-[0_18px_44px_rgba(12,22,40,0.16)] sm:px-7 sm:py-7 ${isDark ? 'bg-[#101a2d] text-white' : 'border border-[#dfe4e9] bg-white text-[#18202b]'}`}>
         <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <h2 id="roster-title" className="text-base font-bold text-[#087fae]">SVCE Admin Dashboard</h2>
+          <h2 id="roster-title" className="text-base font-bold text-[#087fae]">SVCE Alumni Registration</h2>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={toggleTheme} aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`} className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold ${isDark ? 'border-[#44536a] text-[#e0e6ef] hover:bg-[#2c3b50]' : 'border-[#d9e0e5] text-[#334155] hover:bg-[#f1f4f6]'}`}>{isDark ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}{isDark ? 'Light mode' : 'Dark mode'}</button>
             <span className={`shrink-0 rounded-md px-3 py-1.5 text-xs ${isDark ? 'bg-[#1d293d] text-[#a6b2c4]' : 'bg-[#eef2f6] text-[#64748b]'}`}>Role: Administrator</span>
@@ -210,24 +277,26 @@ export default function RegistrationsWorkspace({ view }: { view: 'dashboard' | '
           <table className="w-full min-w-[900px] table-fixed text-left">
             <thead>
               <tr className={`text-sm font-semibold ${isDark ? 'text-[#9aa7ba]' : 'text-[#64748b]'}`}>
-                <th scope="col" className="w-[8%] px-2 py-2">Photo</th>
-                <th scope="col" className="w-[16%] px-2 py-2">Alumni Name</th>
-                <th scope="col" className="w-[13%] px-2 py-2">Alumni ID</th>
-                <th scope="col" className="w-[11%] px-2 py-2">USN</th>
-                <th scope="col" className="w-[8%] px-2 py-2">Batch</th>
-                <th scope="col" className="w-[14%] px-2 py-2">Branch</th>
-                <th scope="col" className="w-[10%] px-2 py-2">Attendance</th>
-                <th scope="col" className="w-[10%] px-2 py-2">Status</th>
-                <th scope="col" className="w-[10%] px-2 py-2 text-right">Actions</th>
+                <th scope="col" className="w-[7%] px-2 py-2">Photo</th>
+                <th scope="col" className="w-[13%] px-2 py-2">Alumni Name</th>
+                <th scope="col" className="w-[10%] px-2 py-2">Alumni ID</th>
+                <th scope="col" className="w-[9%] px-2 py-2">USN</th>
+                <th scope="col" className="w-[6%] px-2 py-2">Batch</th>
+                <th scope="col" className="w-[11%] px-2 py-2">Branch</th>
+                <th scope="col" className="w-[8%] px-2 py-2">Attendance</th>
+                <th scope="col" className="w-[8%] px-2 py-2">Registration</th>
+                <th scope="col" className="w-[8%] px-2 py-2">Membership</th>
+                <th scope="col" className="w-[8%] px-2 py-2">Entry Pass</th>
+                <th scope="col" className="w-[12%] px-2 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={9} className="px-2 py-8 text-sm text-[#a6b2c4]">Loading alumni registrations...</td></tr>
+                <tr><td colSpan={11} className="px-2 py-8 text-sm text-[#a6b2c4]">Loading alumni registrations...</td></tr>
               ) : registrations.length === 0 ? (
-                <tr><td colSpan={9} className="px-2 py-8 text-sm text-[#a6b2c4]">No alumni registrations yet.</td></tr>
+                <tr><td colSpan={11} className="px-2 py-8 text-sm text-[#a6b2c4]">No alumni registrations yet.</td></tr>
               ) : registrations.map((registration) => (
-                <tr key={registration.id} className={`border-t text-sm ${isDark ? 'border-white/0 hover:bg-white/[0.04]' : 'border-[#eef0f3] hover:bg-[#f7f9fb]'}`}>
+                <tr key={registration.id} className={`border-t text-sm ${isDark ? 'border-white/0 hover:bg-white/[0.04]' : 'border-[#eef0f3] hover:bg-[#f7f9fb]'} ${rowToneClasses(rowTone(registration), isDark)}`}>
                   <td className="px-2 py-3">
                     {registration.photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -241,12 +310,30 @@ export default function RegistrationsWorkspace({ view }: { view: 'dashboard' | '
                   <td className="px-2 py-3">
                     <button type="button" onClick={() => openDetail(registration)} className={`block max-w-full truncate text-left font-semibold outline-none hover:underline ${isDark ? 'text-white' : 'text-[#18202b]'}`}>{registration.name}</button>
                   </td>
-                  <td className={`px-2 py-3 truncate ${isDark ? 'text-[#e0e6ef]' : 'text-[#334155]'}`}>{registration.alumniId}</td>
+                  <td className={`px-2 py-3 truncate ${isDark ? 'text-[#e0e6ef]' : 'text-[#334155]'}`}>{registration.alumniId ?? 'Pending approval'}</td>
                   <td className={`px-2 py-3 truncate ${isDark ? 'text-[#e0e6ef]' : 'text-[#334155]'}`}>{registration.usn || '—'}</td>
                   <td className={`px-2 py-3 ${isDark ? 'text-[#e0e6ef]' : 'text-[#334155]'}`}>{registration.batchYear}</td>
                   <td className={`px-2 py-3 truncate ${isDark ? 'text-[#e0e6ef]' : 'text-[#334155]'}`}>{registration.branch}</td>
                   <td className={`px-2 py-3 ${isDark ? 'text-[#e0e6ef]' : 'text-[#334155]'}`}>{registration.attending ? 'Attending' : 'Not attending'}</td>
                   <td className={`px-2 py-3 font-bold ${statusClasses(registration.status, theme)}`}>{registration.status[0] + registration.status.slice(1).toLowerCase()}</td>
+                  <td className="px-2 py-3">
+                    {registration.status === 'APPROVED' ? (
+                      <span title={`Membership card: ${registration.membershipStatus === 'SENT' ? 'sent' : 'not sent'}`}>
+                        <DocSentIcon status={registration.membershipStatus} isDark={isDark} />
+                      </span>
+                    ) : (
+                      <span className={isDark ? 'text-[#5a6880]' : 'text-[#a5adb7]'}>—</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-3">
+                    {registration.status === 'APPROVED' ? (
+                      <span title={`Entry pass: ${registration.entryPassStatus === 'NOT_APPLICABLE' ? 'not applicable' : registration.entryPassStatus === 'SENT' ? 'sent' : 'not sent'}`}>
+                        <DocSentIcon status={registration.entryPassStatus} isDark={isDark} />
+                      </span>
+                    ) : (
+                      <span className={isDark ? 'text-[#5a6880]' : 'text-[#a5adb7]'}>—</span>
+                    )}
+                  </td>
                   <td className="px-2 py-3">
                     <div className="flex justify-end gap-1.5">
                       <button type="button" onClick={() => openDetail(registration)} title="View full registration" className={`flex size-8 items-center justify-center rounded-md ${isDark ? 'text-[#e0e6ef] hover:bg-[#2c3b50]' : 'text-[#334155] hover:bg-[#eef2f6]'}`}><Eye className="size-4" /></button>
@@ -264,16 +351,14 @@ export default function RegistrationsWorkspace({ view }: { view: 'dashboard' | '
           </table>
         </div>
 
-        {view === 'registrations' && (
-          <div className={`mt-4 flex items-center justify-between text-xs ${isDark ? 'text-[#96a3b6]' : 'text-[#64748b]'}`}>
-            <span>{total} alumni registration{total === 1 ? '' : 's'}</span>
-            <div className="flex items-center gap-2">
-              <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="rounded border border-[#dfe4e9] px-2 py-1 disabled:opacity-40">Previous</button>
-              <span>Page {page} of {totalPages}</span>
-              <button type="button" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)} className="rounded border border-[#dfe4e9] px-2 py-1 disabled:opacity-40">Next</button>
-            </div>
+        <div className={`mt-4 flex items-center justify-between text-xs ${isDark ? 'text-[#96a3b6]' : 'text-[#64748b]'}`}>
+          <span>{total} alumni registration{total === 1 ? '' : 's'}</span>
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="rounded border border-[#dfe4e9] px-2 py-1 disabled:opacity-40">Previous</button>
+            <span>Page {page} of {totalPages}</span>
+            <button type="button" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)} className="rounded border border-[#dfe4e9] px-2 py-1 disabled:opacity-40">Next</button>
           </div>
-        )}
+        </div>
       </div>
 
       {viewing && (
@@ -290,7 +375,7 @@ export default function RegistrationsWorkspace({ view }: { view: 'dashboard' | '
                   </span>
                 )}
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#087fae]">{viewing.alumniId}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#087fae]">{viewing.alumniId ?? 'Pending approval'}</p>
                   <h3 id="alumni-detail-title" className="mt-0.5 text-xl font-bold">{viewing.name}</h3>
                   <p className={`mt-0.5 text-xs font-bold ${statusClasses(viewing.status, theme)}`}>{viewing.status}</p>
                 </div>
@@ -310,6 +395,7 @@ export default function RegistrationsWorkspace({ view }: { view: 'dashboard' | '
                 <>
                   <Detail label="Accompanying people" value={String(viewing.peopleCount ?? '—')} isDark={isDark} />
                   <Detail label="Food preference" value={viewing.food === 'NON_VEG' ? 'Non-vegetarian' : viewing.food === 'VEG' ? 'Vegetarian' : '—'} isDark={isDark} />
+                  <Detail label="Checked in at event" value={viewing.checkedIn ? `Yes — ${formatDate(viewing.checkedInAt)}` : 'Not yet'} isDark={isDark} />
                 </>
               )}
             </DetailSection>
@@ -357,47 +443,61 @@ export default function RegistrationsWorkspace({ view }: { view: 'dashboard' | '
               </div>
             )}
 
-            {viewing.status === 'APPROVED' && (
-              <div className={`mt-5 space-y-3 rounded-lg border p-4 ${isDark ? 'border-[#334258]' : 'border-[#e9edf0]'}`}>
+            {/* Shown for Pending/Approved/Rejected alike — registration status
+                and document/email status are two different things (Part 4);
+                only the Send actions are gated to approved registrations. */}
+            <div className={`mt-5 space-y-3 rounded-lg border p-4 ${isDark ? 'border-[#334258]' : 'border-[#e9edf0]'}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold">Digital documents</p>
+                {viewing.status === 'APPROVED' && (
+                  <button type="button" disabled={busy === 'send-both'} onClick={() => sendBoth(viewing)} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#0788c5] px-2.5 text-xs font-semibold text-white hover:bg-[#0675aa] disabled:opacity-50"><MailCheck className="size-3.5" />{busy === 'send-both' ? 'Sending...' : 'Send Both'}</button>
+                )}
+              </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-black/5 px-3 py-2.5 dark:bg-white/5">
-                  <div className="flex items-center gap-2">
-                    <IdCard className="size-4 shrink-0 text-[#087fae]" />
-                    <span className="text-sm font-medium">Membership card</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${isDark ? 'bg-[#1d293d] text-[#a6b2c4]' : 'bg-[#eef2f6] text-[#64748b]'}`}>{documentStatusLabel(viewing.membershipStatus)}</span>
-                  </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-black/5 px-3 py-2.5 dark:bg-white/5">
+                <div className="flex items-center gap-2">
+                  <IdCard className="size-4 shrink-0 text-[#087fae]" />
+                  <span className="text-sm font-medium">Membership Card</span>
+                  <SendStatusBadge
+                    sent={viewing.membershipStatus === 'SENT'}
+                    failed={viewing.membershipStatus !== 'SENT' && latestEmailStatus(emailHistory, 'MEMBERSHIP_CARD') === 'FAILED'}
+                    isDark={isDark}
+                  />
+                </div>
+                {viewing.status === 'APPROVED' && (
                   <div className="flex flex-wrap gap-2">
                     {viewing.membershipCardUrl && (
                       <a href={viewing.membershipCardUrl} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#d9e0e5] px-2.5 text-xs font-semibold text-[#334155] hover:bg-[#f1f4f6]"><Download className="size-3.5" />View</a>
                     )}
-                    {viewing.membershipStatus === 'NOT_GENERATED' && (
-                      <button type="button" disabled={busy === 'generate-membership'} onClick={() => generateMembership(viewing)} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#0788c5] px-2.5 text-xs font-semibold text-white hover:bg-[#0675aa] disabled:opacity-50"><IdCard className="size-3.5" />{busy === 'generate-membership' ? 'Generating...' : 'Generate'}</button>
-                    )}
-                    <button type="button" disabled={busy === 'send-membership'} onClick={() => sendMembership(viewing)} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#0788c5] px-2.5 text-xs font-semibold text-white hover:bg-[#0675aa] disabled:opacity-50"><Send className="size-3.5" />{busy === 'send-membership' ? 'Sending...' : viewing.membershipStatus === 'SENT' ? 'Resend' : 'Send'}</button>
+                    <button type="button" disabled={busy === 'send-membership'} onClick={() => sendMembership(viewing)} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#0788c5] px-2.5 text-xs font-semibold text-white hover:bg-[#0675aa] disabled:opacity-50"><Send className="size-3.5" />{busy === 'send-membership' ? 'Sending...' : viewing.membershipStatus === 'SENT' ? 'Resend' : 'Send Membership Card'}</button>
                   </div>
-                </div>
+                )}
+              </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-black/5 px-3 py-2.5 dark:bg-white/5">
-                  <div className="flex items-center gap-2">
-                    <TicketCheck className="size-4 shrink-0 text-[#087fae]" />
-                    <span className="text-sm font-medium">Event entry pass</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${isDark ? 'bg-[#1d293d] text-[#a6b2c4]' : 'bg-[#eef2f6] text-[#64748b]'}`}>{documentStatusLabel(viewing.entryPassStatus)}</span>
-                  </div>
-                  {viewing.entryPassStatus !== 'NOT_APPLICABLE' && (
-                    <div className="flex flex-wrap gap-2">
-                      {viewing.entryPassUrl && (
-                        <a href={viewing.entryPassUrl} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#d9e0e5] px-2.5 text-xs font-semibold text-[#334155] hover:bg-[#f1f4f6]"><Download className="size-3.5" />View</a>
-                      )}
-                      {viewing.entryPassStatus === 'NOT_GENERATED' && (
-                        <button type="button" disabled={busy === 'generate-entry-pass'} onClick={() => generateEntryPass(viewing)} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#0788c5] px-2.5 text-xs font-semibold text-white hover:bg-[#0675aa] disabled:opacity-50"><TicketCheck className="size-3.5" />{busy === 'generate-entry-pass' ? 'Generating...' : 'Generate'}</button>
-                      )}
-                      <button type="button" disabled={busy === 'send-entry-pass'} onClick={() => sendEntryPass(viewing)} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#0788c5] px-2.5 text-xs font-semibold text-white hover:bg-[#0675aa] disabled:opacity-50"><Send className="size-3.5" />{busy === 'send-entry-pass' ? 'Sending...' : viewing.entryPassStatus === 'SENT' ? 'Resend' : 'Send'}</button>
-                    </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-black/5 px-3 py-2.5 dark:bg-white/5">
+                <div className="flex items-center gap-2">
+                  <TicketCheck className="size-4 shrink-0 text-[#087fae]" />
+                  <span className="text-sm font-medium">Entry Pass</span>
+                  {viewing.entryPassStatus === 'NOT_APPLICABLE' ? (
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${isDark ? 'bg-[#1d293d] text-[#a6b2c4]' : 'bg-[#eef2f6] text-[#64748b]'}`}>Not applicable</span>
+                  ) : (
+                    <SendStatusBadge
+                      sent={viewing.entryPassStatus === 'SENT'}
+                      failed={viewing.entryPassStatus !== 'SENT' && latestEmailStatus(emailHistory, 'ENTRY_PASS') === 'FAILED'}
+                      isDark={isDark}
+                    />
                   )}
                 </div>
+                {viewing.status === 'APPROVED' && viewing.entryPassStatus !== 'NOT_APPLICABLE' && (
+                  <div className="flex flex-wrap gap-2">
+                    {viewing.entryPassUrl && (
+                      <a href={viewing.entryPassUrl} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#d9e0e5] px-2.5 text-xs font-semibold text-[#334155] hover:bg-[#f1f4f6]"><Download className="size-3.5" />View</a>
+                    )}
+                    <button type="button" disabled={busy === 'send-entry-pass'} onClick={() => sendEntryPass(viewing)} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#0788c5] px-2.5 text-xs font-semibold text-white hover:bg-[#0675aa] disabled:opacity-50"><Send className="size-3.5" />{busy === 'send-entry-pass' ? 'Sending...' : viewing.entryPassStatus === 'SENT' ? 'Resend' : 'Send Entry Pass'}</button>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             <div className={`mt-5 rounded-lg border p-4 ${isDark ? 'border-[#334258]' : 'border-[#e9edf0]'}`}>
               <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Mail className="size-4" />Email history</p>

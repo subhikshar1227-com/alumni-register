@@ -4,7 +4,7 @@ export type DocumentStatus = 'NOT_APPLICABLE' | 'NOT_GENERATED' | 'GENERATED' | 
 
 export type AlumniRegistration = {
 	id: string
-	alumniId: string
+	alumniId: string | null
 	name: string
 	batchYear: number
 	branch: string
@@ -26,6 +26,8 @@ export type AlumniRegistration = {
 	membershipCardUrl: string | null
 	entryPassStatus: DocumentStatus
 	entryPassUrl: string | null
+	checkedIn: boolean
+	checkedInAt: string | null
 	createdAt: string
 	updatedAt: string
 	approvedAt: string | null

@@ -8,9 +8,10 @@
 //
 // Migrations are only ever generated/run from THIS app (alumni_2026).
 // The admin portal only runs `prisma generate` (never `migrate`) against
-// this same schema file. If you change this file, copy it over to the
-// admin portal's prisma/schema.prisma too and re-run `prisma generate`
-// in both projects.
+// this same schema file. Edit ONLY this copy — the admin portal's
+// prisma/schema.prisma is auto-synced from this file (see its
+// scripts/sync-schema.js, wired into its dev/build/db:generate scripts),
+// so it is a build artifact, never hand-edited.
 
 generator client {
   provider = "prisma-client-js"
@@ -54,8 +55,8 @@ enum EmailLogStatus {
 }
 
 model AlumniRegistration {
-  id       String @id @default(cuid())
-  alumniId String @unique // e.g. SVCE-ALM-000001, generated once, never changes
+  id       String  @id @default(cuid())
+  alumniId String? @unique // e.g. SVCE-ALM-000001 — null until admin approval, then set once and never changes
 
   // Personal details
   name      String
@@ -92,6 +93,11 @@ model AlumniRegistration {
   membershipCardPath String?
   entryPassStatus    DocumentStatus @default(NOT_GENERATED)
   entryPassPath      String?
+
+  // Event-day check-in — set when the Entry Pass QR is scanned at the gate
+  // and the coordinator confirms arrival (see admin /checkin/[alumniId]).
+  checkedIn   Boolean   @default(false)
+  checkedInAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

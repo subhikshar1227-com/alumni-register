@@ -6,14 +6,25 @@ import QRCode from "qrcode"
 const STORAGE_SUBDIR = process.env.DOCUMENT_STORAGE_DIR || "documents"
 const PUBLIC_APP_URL = process.env.ADMIN_PUBLIC_APP_URL || "http://localhost:3001"
 
+// Membership Card QR — opens the official college website (verification /
+// "learn more" link), not the Alumni ID.
+const SVCE_WEBSITE_URL = "https://svcengg.edu.in/"
+
+// Both provided template images are 1536x1024 — the SVG canvas below uses
+// that exact size so template coordinates map 1:1 to SVG coordinates.
+const TEMPLATE_WIDTH = 1536
+const TEMPLATE_HEIGHT = 1024
+
 type CardInput = {
   alumniId: string
   name: string
   batchYear: number
   branch: string
   usn: string | null
-  phone?: string
+  phone: string
   photoUrl: string | null
+  company: string | null
+  position: string | null
 }
 
 function escapeXml(value: string) {
@@ -27,15 +38,6 @@ function escapeXml(value: string) {
     }
     return entities[character]
   })
-}
-
-function initialsOf(name: string) {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase()
 }
 
 async function fetchPhotoDataUri(photoUrl: string | null): Promise<string | null> {
@@ -67,7 +69,7 @@ async function readImageDataUri(filePath: string): Promise<string | null> {
 }
 
 async function qrDataUri(text: string): Promise<string> {
-  return QRCode.toDataURL(text, { margin: 1, width: 200 })
+  return QRCode.toDataURL(text, { margin: 1, width: 400 })
 }
 
 function renderPng(svg: string): Buffer {
@@ -89,167 +91,130 @@ async function saveDocument(buffer: Buffer, filename: string) {
   return { documentPath, documentUrl }
 }
 
+function fieldOrDash(value: string | null | undefined) {
+  const trimmed = (value ?? "").trim()
+  return trimmed ? escapeXml(trimmed) : "—"
+}
+
+// ──────────────────────────────────────────────────────────────
+// Alumni Card — the provided template image (public/templates/
+// alumni-card-template.jpg) is the actual visual design. This function
+// only overlays dynamic data (photo, QR, text) on top of it; the template
+// itself is never redrawn or redesigned.
+// ──────────────────────────────────────────────────────────────
 export async function generateMembershipCard(input: CardInput) {
-  const [photoDataUri, qrCode, logoDataUri, campusDataUri] = await Promise.all([
+  const [templateDataUri, photoDataUri, qrCode] = await Promise.all([
+    readImageDataUri(path.join(process.cwd(), "public", "templates", "alumni-card-template.jpg")),
     fetchPhotoDataUri(input.photoUrl),
-    qrDataUri(input.alumniId),
-    readImageDataUri(path.join(process.cwd(), "logo.png")),
-    readImageDataUri(path.join(process.cwd(), "public", "campus.jpg")),
+    qrDataUri(SVCE_WEBSITE_URL),
   ])
 
   const name = escapeXml(input.name)
-  const usn = escapeXml(input.usn ?? "")
+  const alumniId = escapeXml(input.alumniId)
+  const usn = fieldOrDash(input.usn)
   const branch = escapeXml(input.branch)
-  const phone = escapeXml(input.phone ? `+91 ${input.phone}` : "")
+  const role = fieldOrDash(input.position)
+  const company = fieldOrDash(input.company)
 
+  // Photo placeholder box — the INNER white area inside the gold frame,
+  // measured precisely against the 1536x1024 template (not the frame
+  // itself), so the photo sits flush inside the border instead of
+  // overlapping it.
+  const photoBox = { x: 63, y: 410, width: 247, height: 300 }
   const photoMarkup = photoDataUri
-    ? `<image href="${photoDataUri}" x="60" y="280" width="140" height="140" clip-path="url(#portraitClip)" preserveAspectRatio="xMidYMid slice" />`
-    : `<circle cx="130" cy="350" r="70" fill="#f8f6f0"/><text x="130" y="365" text-anchor="middle" fill="#1a365d" font-size="36" font-weight="700">${escapeXml(initialsOf(input.name))}</text>`
+    ? `<image href="${photoDataUri}" x="${photoBox.x}" y="${photoBox.y}" width="${photoBox.width}" height="${photoBox.height}" clip-path="url(#photoClip)" preserveAspectRatio="xMidYMid slice" />`
+    : ""
 
-  const campusMarkup = campusDataUri
-    ? `<image href="${campusDataUri}" x="230" y="150" width="570" height="250" clip-path="url(#campusClip)" preserveAspectRatio="xMidYMid slice" />`
-    : `<rect x="230" y="150" width="570" height="250" fill="#1a365d"/><text x="515" y="275" text-anchor="middle" fill="#d4af37" font-family="serif" font-size="24" letter-spacing="2">SVCE CAMPUS</text>`
+  // QR placeholder box — opens the SVCE website when scanned (verification
+  // link), fully covering the template's static QR artwork.
+  const qrBox = { x: 1300, y: 592, width: 178, height: 124 }
 
-  const logoMarkup = logoDataUri
-    ? `<image href="${logoDataUri}" x="40" y="25" width="80" height="90" preserveAspectRatio="xMidYMid meet" />`
-    : `<circle cx="80" cy="70" r="40" fill="#d4af37"/><text x="80" y="80" text-anchor="middle" fill="#1a365d" font-size="20" font-weight="700">SVCE</text>`
+  // The template's own labels ("Alumni Name :", "Branch :", etc.) are
+  // already printed correctly — only the value after each colon is
+  // placeholder text ("Your Name Here", "SVCEALUM123", ...) baked into the
+  // template image, so each row gets a cover rect (matching the panel's
+  // cream background) plus the real value drawn on top of it.
+  const CARD_PANEL_BG = "#f8f6f0"
+  const valueX = 674
+  const values = [name, alumniId, usn, branch, String(input.batchYear), role, company]
+  const rowStartY = 595
+  const rowSpacing = 38
+  const rowsMarkup = values
+    .map(
+      (value, index) => `
+      <rect x="660" y="${rowStartY + index * rowSpacing - 28}" width="360" height="${index === values.length - 1 ? 60 : 40}" fill="${CARD_PANEL_BG}" />
+      <text x="${valueX}" y="${rowStartY + index * rowSpacing}" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#1e3a6e">${value}</text>`,
+    )
+    .join("")
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="640" viewBox="0 0 1024 640" role="img" aria-label="SVCE Alumni Card for ${name}">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${TEMPLATE_WIDTH}" height="${TEMPLATE_HEIGHT}" viewBox="0 0 ${TEMPLATE_WIDTH} ${TEMPLATE_HEIGHT}" role="img" aria-label="SVCE Alumni Card for ${name}">
     <title>SVCE Alumni Card - ${name}</title>
     <defs>
-      <clipPath id="cardClip"><rect width="1024" height="640" rx="24"/></clipPath>
-      <clipPath id="portraitClip"><rect x="60" y="280" width="140" height="140" rx="12"/></clipPath>
-      <clipPath id="campusClip"><path d="M230 150h570v200c0 27.614-22.386 50-50 50H280c-27.614 0-50-22.386-50-50V150z"/></clipPath>
-      <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" style="stop-color:#1a365d;stop-opacity:1" />
-        <stop offset="100%" style="stop-color:#2c5282;stop-opacity:1" />
-      </linearGradient>
-      <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#f6e05e;stop-opacity:1" />
-        <stop offset="50%" style="stop-color:#d4af37;stop-opacity:1" />
-        <stop offset="100%" style="stop-color:#b7791f;stop-opacity:1" />
-      </linearGradient>
-      <linearGradient id="silverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#e2e8f0;stop-opacity:1" />
-        <stop offset="50%" style="stop-color:#cbd5e0;stop-opacity:1" />
-        <stop offset="100%" style="stop-color:#a0aec0;stop-opacity:1" />
-      </linearGradient>
+      <clipPath id="photoClip"><rect x="${photoBox.x}" y="${photoBox.y}" width="${photoBox.width}" height="${photoBox.height}" rx="10" /></clipPath>
     </defs>
-    <g clip-path="url(#cardClip)">
-      <!-- Card Background -->
-      <rect width="1024" height="640" fill="#f8f6f0"/>
-      
-      <!-- Header Section -->
-      <rect width="1024" height="150" fill="url(#headerGrad)"/>
-      
-      <!-- Logo -->
-      ${logoMarkup}
-      
-      <!-- College Name -->
-      <text x="140" y="50" fill="#ffffff" font-size="32" font-weight="700" letter-spacing="1">SRI VENKATESHWARA</text>
-      <text x="140" y="80" fill="#ffffff" font-size="32" font-weight="700" letter-spacing="1">COLLEGE OF ENGINEERING</text>
-      <text x="140" y="105" fill="#cbd5e0" font-size="16" letter-spacing="2">BENGALURU</text>
-      <text x="140" y="125" fill="#a0aec0" font-size="12" letter-spacing="1">KNOWLEDGE • INNOVATION • A BETTER TOMORROW</text>
-      
-      <!-- Silver Jubilee Badge -->
-      <circle cx="870" cy="75" r="60" fill="url(#goldGrad)" stroke="#b7791f" stroke-width="3"/>
-      <path d="M830,45 Q830,35 840,35 L900,35 Q910,35 910,45 L910,105 Q910,115 900,115 L840,115 Q830,115 830,105 Z" fill="none" stroke="#b7791f" stroke-width="2"/>
-      <text x="870" y="60" text-anchor="middle" fill="#1a365d" font-family="serif" font-size="48" font-weight="700">25</text>
-      <text x="870" y="75" text-anchor="middle" fill="#1a365d" font-size="10" letter-spacing="1">th</text>
-      <text x="870" y="90" text-anchor="middle" fill="#1a365d" font-family="serif" font-size="14" font-style="italic">Silver Jubilee</text>
-      <text x="870" y="108" text-anchor="middle" fill="#1a365d" font-size="10" letter-spacing="1">2001 - 2026</text>
-      
-      <!-- Decorative Elements -->
-      <path d="M10,130 Q200,140 500,135 T1014,130" fill="none" stroke="url(#goldGrad)" stroke-width="4"/>
-      
-      <!-- Campus Image Section -->
-      ${campusMarkup}
-      
-      <!-- Curved Transition -->
-      <path d="M230 400 Q400 380 600 385 T1024 390 V640 H230 Z" fill="#f8f6f0"/>
-      <path d="M230 395 Q400 375 600 380 T1024 385" fill="none" stroke="url(#goldGrad)" stroke-width="3"/>
-      
-      <!-- Alumni Card Title Banner -->
-      <rect x="320" y="340" width="460" height="50" rx="25" fill="#1a365d"/>
-      <rect x="325" y="345" width="450" height="40" rx="20" fill="url(#goldGrad)"/>
-      <text x="550" y="370" text-anchor="middle" fill="#1a365d" font-size="24" font-weight="700" letter-spacing="2">♦ SVCE ALUMNI CARD ♦</text>
-      
-      <!-- Alumni Photo -->
-      <rect x="55" y="275" width="150" height="150" rx="12" fill="url(#goldGrad)" stroke="#b7791f" stroke-width="3"/>
-      <rect x="60" y="280" width="140" height="140" rx="8" fill="#ffffff"/>
-      ${photoMarkup}
-      
-      <!-- Alumni Information Section -->
-      <text x="250" y="460" fill="#1a365d" font-size="14" font-weight="700">Alumni Name</text>
-      <text x="380" y="460" fill="#2d3748" font-size="18" font-weight="600" textLength="420" lengthAdjust="spacingAndGlyphs">${name}</text>
-      
-      <text x="250" y="485" fill="#1a365d" font-size="14" font-weight="700">Alumni ID</text>
-      <text x="380" y="485" fill="#2d3748" font-size="16" font-weight="600">${escapeXml(input.alumniId)}</text>
-      
-      ${usn ? `<text x="250" y="510" fill="#1a365d" font-size="14" font-weight="700">USN (Optional)</text>
-      <text x="380" y="510" fill="#2d3748" font-size="16" font-weight="600">${usn}</text>` : ''}
-      
-      <text x="250" y="${usn ? '535' : '510'}" fill="#1a365d" font-size="14" font-weight="700">Branch</text>
-      <text x="380" y="${usn ? '535' : '510'}" fill="#2d3748" font-size="16" textLength="420" lengthAdjust="spacingAndGlyphs">${branch}</text>
-      
-      <text x="250" y="${usn ? '560' : '535'}" fill="#1a365d" font-size="14" font-weight="700">Year of Graduation</text>
-      <text x="380" y="${usn ? '560' : '535'}" fill="#2d3748" font-size="16" font-weight="600">${input.batchYear}</text>
-      
-      ${phone ? `<text x="250" y="${usn ? '585' : '560'}" fill="#1a365d" font-size="14" font-weight="700">Contact Number</text>
-      <text x="380" y="${usn ? '585' : '560'}" fill="#2d3748" font-size="16" font-weight="600">${phone}</text>` : ''}
-      
-      <!-- QR Code Section -->
-      <rect x="830" y="430" width="150" height="150" rx="12" fill="#ffffff" stroke="url(#goldGrad)" stroke-width="3"/>
-      <image href="${qrCode}" x="845" y="445" width="120" height="120" />
-      <text x="905" y="600" text-anchor="middle" fill="#1a365d" font-size="11" font-weight="700" letter-spacing="1">SCAN FOR VERIFICATION</text>
-      
-      <!-- Tagline -->
-      <text x="130" y="490" text-anchor="middle" fill="#d4af37" font-family="serif" font-size="14" font-style="italic" transform="rotate(-90 130 490)">Once an SVCEian,</text>
-      <text x="130" y="520" text-anchor="middle" fill="#d4af37" font-family="serif" font-size="14" font-style="italic" transform="rotate(-90 130 520)">Always an SVCEian</text>
-      <path d="M110,460 L110,540" stroke="url(#goldGrad)" stroke-width="2"/>
-      
-      <!-- Footer -->
-      <rect x="0" y="590" width="1024" height="50" fill="url(#headerGrad)"/>
-      <text x="80" y="610" fill="#d4af37" font-size="12" font-weight="700">LIFELONG</text>
-      <text x="80" y="625" fill="#cbd5e0" font-size="10">CONNECTIONS</text>
-      
-      <text x="280" y="610" fill="#d4af37" font-size="12" font-weight="700">LEARNING BEYOND</text>
-      <text x="280" y="625" fill="#cbd5e0" font-size="10">CLASSROOMS</text>
-      
-      <text x="520" y="610" fill="#d4af37" font-size="12" font-weight="700">NETWORK</text>
-      <text x="520" y="625" fill="#cbd5e0" font-size="10">FOR GROWTH</text>
-      
-      <text x="720" y="610" fill="#d4af37" font-size="12" font-weight="700">CONTRIBUTE TO A</text>
-      <text x="720" y="625" fill="#cbd5e0" font-size="10">BRIGHTER TOMORROW</text>
-      
-      <!-- Card Border -->
-      <rect x="4" y="4" width="1016" height="632" rx="20" fill="none" stroke="url(#goldGrad)" stroke-width="4"/>
-    </g>
+    ${templateDataUri ? `<image href="${templateDataUri}" x="0" y="0" width="${TEMPLATE_WIDTH}" height="${TEMPLATE_HEIGHT}" preserveAspectRatio="none" />` : `<rect width="${TEMPLATE_WIDTH}" height="${TEMPLATE_HEIGHT}" fill="#0c1d3d"/>`}
+    ${photoMarkup}
+    ${rowsMarkup}
+    <image href="${qrCode}" x="${qrBox.x}" y="${qrBox.y}" width="${qrBox.width}" height="${qrBox.height}" />
   </svg>`
 
   const buffer = renderPng(svg)
   return saveDocument(buffer, `${input.alumniId}-membership-card.png`)
 }
 
+// ──────────────────────────────────────────────────────────────
+// Entry Pass — same approach: public/templates/entry-pass-template.jpg is
+// the actual visual design, only the dynamic fields are overlaid.
+// ──────────────────────────────────────────────────────────────
 export async function generateEntryPass(input: CardInput) {
-  const qrCode = await qrDataUri(input.alumniId)
-  const name = escapeXml(input.name)
-  const usn = escapeXml(input.usn ?? "—")
-  const branch = escapeXml(input.branch)
+  // Scanning this QR at the gate opens the coordinator check-in page for
+  // this Alumni ID (shows how many people are expected, lets them confirm
+  // arrival) — see app/checkin/[alumniId] and app/api/checkin/[alumniId].
+  const checkinUrl = `${PUBLIC_APP_URL.replace(/\/$/, "")}/checkin/${encodeURIComponent(input.alumniId)}`
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="360" viewBox="0 0 1000 360" role="img" aria-label="SVCE Event Entry Pass for ${name}">
+  const [templateDataUri, photoDataUri, qrCode] = await Promise.all([
+    readImageDataUri(path.join(process.cwd(), "public", "templates", "entry-pass-template.jpg")),
+    fetchPhotoDataUri(input.photoUrl),
+    qrDataUri(checkinUrl),
+  ])
+
+  const name = escapeXml(input.name)
+  const nameUpper = escapeXml(input.name.toUpperCase())
+  const alumniId = escapeXml(input.alumniId)
+  const phone = escapeXml(input.phone ? `+91 ${input.phone}` : "—")
+
+  // Inner white area inside the gold frame, measured precisely against the
+  // 1536x1024 template so the photo sits flush inside the border.
+  const photoBox = { x: 58, y: 473, width: 234, height: 228 }
+  const photoMarkup = photoDataUri
+    ? `<image href="${photoDataUri}" x="${photoBox.x}" y="${photoBox.y}" width="${photoBox.width}" height="${photoBox.height}" clip-path="url(#photoClip)" preserveAspectRatio="xMidYMid slice" />`
+    : ""
+
+  const qrBox = { x: 1225, y: 442, width: 255, height: 243 }
+
+  // "ALUMNI NAME" and "BRANCH | GRADUATION YEAR" are themselves placeholder
+  // text baked into the template (not static labels), so those two lines
+  // get a full-width cover rect. "Alumni ID :" / "Contact No. :" are real
+  // static labels — only their value needs covering + replacing, same
+  // approach as the Alumni Card.
+  const PASS_PANEL_BG = "#101a2d"
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${TEMPLATE_WIDTH}" height="${TEMPLATE_HEIGHT}" viewBox="0 0 ${TEMPLATE_WIDTH} ${TEMPLATE_HEIGHT}" role="img" aria-label="SVCE Event Entry Pass for ${name}">
     <title>SVCE Event Entry Pass - ${name}</title>
-    <rect width="1000" height="360" rx="28" fill="#101a2d"/>
-    <rect x="24" y="24" width="952" height="312" rx="18" fill="#fff"/>
-    <path d="M690 24h268a18 18 0 0 1 18 18v276a18 18 0 0 1-18 18H690z" fill="#eaf3f7"/>
-    <text x="64" y="86" fill="#176b87" font-size="25" font-weight="700" letter-spacing="2">SVCE / SILVER JUBILEE</text>
-    <text x="64" y="145" fill="#172b3a" font-size="38" font-weight="700">${name}</text>
-    <text x="64" y="188" fill="#5c6c79" font-size="21">USN ${usn} · Batch ${input.batchYear} · ${branch}</text>
-    <text x="64" y="230" fill="#5c6c79" font-size="18">Alumni ID ${escapeXml(input.alumniId)}</text>
-    <text x="64" y="275" fill="#172b3a" font-size="18" font-weight="700">ALUMNI REUNION · 25TH SILVER JUBILEE</text>
-    <text x="728" y="120" fill="#176b87" font-size="22" font-weight="700" letter-spacing="2">ENTRY PASS</text>
-    <text x="728" y="160" fill="#172b3a" font-size="26" font-weight="700">ADMIT ONE</text>
-    <image href="${qrCode}" x="728" y="180" width="110" height="110" />
+    <defs>
+      <clipPath id="photoClip"><rect x="${photoBox.x}" y="${photoBox.y}" width="${photoBox.width}" height="${photoBox.height}" rx="10" /></clipPath>
+    </defs>
+    ${templateDataUri ? `<image href="${templateDataUri}" x="0" y="0" width="${TEMPLATE_WIDTH}" height="${TEMPLATE_HEIGHT}" preserveAspectRatio="none" />` : `<rect width="${TEMPLATE_WIDTH}" height="${TEMPLATE_HEIGHT}" fill="${PASS_PANEL_BG}"/>`}
+    ${photoMarkup}
+    <rect x="476" y="552" width="710" height="60" fill="${PASS_PANEL_BG}" />
+    <text x="480" y="600" font-family="Arial, sans-serif" font-size="46" font-weight="700" letter-spacing="1" fill="#f3cf72">${nameUpper}</text>
+    <rect x="476" y="600" width="710" height="42" fill="${PASS_PANEL_BG}" />
+    <text x="480" y="632" font-family="Arial, sans-serif" font-size="21" letter-spacing="2" fill="#e8ecf3">${escapeXml(input.branch.toUpperCase())} | ${input.batchYear}</text>
+    <rect x="700" y="660" width="330" height="32" fill="${PASS_PANEL_BG}" />
+    <text x="710" y="685" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#ffffff">${alumniId}</text>
+    <rect x="700" y="697" width="330" height="32" fill="${PASS_PANEL_BG}" />
+    <text x="710" y="722" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#ffffff">${phone}</text>
+    <image href="${qrCode}" x="${qrBox.x}" y="${qrBox.y}" width="${qrBox.width}" height="${qrBox.height}" />
   </svg>`
 
   const buffer = renderPng(svg)

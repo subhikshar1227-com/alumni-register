@@ -4,10 +4,12 @@
   "private": true,
   "packageManager": "pnpm@12.3.4",
   "scripts": {
+    "predev": "node scripts/sync-schema.js",
     "dev": "next dev --webpack",
+    "prebuild": "node scripts/sync-schema.js",
     "build": "next build",
     "start": "next start",
-    "db:generate": "prisma generate"
+    "db:generate": "node scripts/sync-schema.js && prisma generate"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
